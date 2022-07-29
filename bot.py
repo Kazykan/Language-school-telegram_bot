@@ -11,8 +11,7 @@ dp = Dispatcher(bot)  # Диспетчер для бота
 logging.basicConfig(level=logging.INFO)  # Включаем логирование, чтобы не пропустить важные сообщения
 
 
-# Хэндлер на команду /test1
-@dp.message_handler(commands="test1")
+@dp.message_handler(commands="test1")  # Хэндлер на команду /test1
 async def cmd_test1(message: types.Message):
     await message.reply("Test 1")
 

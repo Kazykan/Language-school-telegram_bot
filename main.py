@@ -355,7 +355,7 @@ def create_group(name: str, quota: int, price: int, duration: int, grade: str, d
 def get_sql_class_time_list(group_id) -> str:
     """Получаем время занятий для группы"""
     class_time_list = session.query(ClassTime.id, ClassRoom.name, ClassTime.start_time, ClassTime.end_time)\
-        .join(ClassRoom).filter(ClassTime.group_id == group_id).all().sort_by
+        .join(ClassRoom).filter(ClassTime.group_id == group_id).group_by(ClassTime.start_time).all()
     group_and_teacher = session.query(Group.name, Teacher.first_name).join(Group).filter(Group.id == group_id).all()[0]
     text = _get_class_time_text([*group_and_teacher], class_time_list)
     return text
