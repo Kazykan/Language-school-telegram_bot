@@ -1,4 +1,4 @@
-from config import TELGRAMM_TOKEN
+from config import TELEGRAM_TOKEN
 import logging
 from aiogram import Bot, Dispatcher, executor, types
 from aiogram.types import ReplyKeyboardRemove, ReplyKeyboardMarkup, KeyboardButton,\
@@ -6,7 +6,7 @@ from aiogram.types import ReplyKeyboardRemove, ReplyKeyboardMarkup, KeyboardButt
 
 from main import get_group_list, get_sql_class_time_list
 
-bot = Bot(token=TELGRAMM_TOKEN)  # Объект бота
+bot = Bot(token=TELEGRAM_TOKEN)  # Объект бота
 dp = Dispatcher(bot)  # Диспетчер для бота
 logging.basicConfig(level=logging.INFO)  # Включаем логирование, чтобы не пропустить важные сообщения
 
