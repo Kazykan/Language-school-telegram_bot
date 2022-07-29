@@ -269,22 +269,46 @@ class GroupAdd:
     description: str
     grade: str
     teacher_id: int
-    
 
-def get_schedule_teacher(teacher_name):
-    _teacher_name = f'%{teacher_name}%'
-    teacher_group_list = session.query(ClassTime.class_room_id, Group.name, Teacher.first_name, ClassTime.start_time).join(ClassTime).join(Teacher).filter(Teacher.first_name.ilike(_teacher_name)).group_by(ClassTime.start_time).all()
-    # index = 0
-    # for room_id in teacher_group_list:
-    #     print(room_id[0])
-    #     teacher_group_list[index].append(get_classroom_name(room_id[0]))
-    #     index += 1
+
+def get_teacher_list():
+    teacher_list = session.query(Teacher.last_name, Teacher.first_name, Teacher.id).all()
+    text = f'Список преподавателей:'
+    for teacher in teacher_list:
+        text = text + f'\n{teacher[0]} {teacher[1]} расписание /schedule{teacher[2]}\n__________'
+    return text
+
+
+def get_schedule_teacher(teacher_id: int):
+    try:
+        teacher_group_tuple = session.query(
+            ClassTime.class_room_id, Group.name, Teacher.first_name, ClassTime.start_time, ClassTime.end_time
+        ).join(ClassTime).join(Teacher).join(ClassRoom).filter(Teacher.id == teacher_id)\
+            .group_by(ClassTime.start_time).all()
+    except Exception:
+        return f'Ошибка ввода, преподаватель не найден'
+    teacher_group_list = []
+    index = 0
+    for room_id in teacher_group_tuple:
+        teacher_group_list.append([*room_id])
+        teacher_group_list[index].append(get_classroom_name(room_id[0]))
+        index += 1
     print(teacher_group_list)
+    text = _get_schedule_teacher_text(teacher_group_list)
+    return text
 
 
 def get_classroom_name(id_classroom):
-    class_room = session.query(ClassRoom.name, ClassRoom.location).filter(ClassRoom.id == id_classroom).get()
+    class_room = session.query(ClassRoom.name).filter(ClassRoom.id == id_classroom).scalar()
+    print(class_room)
     return class_room
+
+
+def _get_schedule_teacher_text(teacher_group_list: list) -> str:
+    text = f'Расписание {teacher_group_list[0][2]}\n____________\n'
+    for index in teacher_group_list:
+        text = text + f'{index[1]}\n' + _get_time_room_text(start_time=index[3], end_time=index[4], room=index[5])
+    return text
 
 
 def get_group_list():
@@ -306,6 +330,7 @@ def get_group_text(group_list: list) -> str:
 
 
 def get_group_grade(grade: int):
+    """Получаем список групп по запросу цифры класса - grade"""
     grade_str = f'%{str(grade)}%'
     group_tuple = session.query(
         Group.id, Group.name, Group.quota, Group.price, Group.duration, Teacher.first_name)\
@@ -329,7 +354,9 @@ def tuple_to_list_add_user_count(group_tuple: list) -> list:
 
 def get_user_free() -> list:
     """Список всех учеников которые не состоят не в каких группах"""
-    user_list = session.query(User.id, User.first_name, User.last_name, User.birthday).filter(User.group_id == None).all()
+    user_list = session.query(
+        User.id, User.first_name, User.last_name, User.birthday
+    ).filter(User.group_id == None).all()
     return user_list
 
 
@@ -362,10 +389,18 @@ def get_sql_class_time_list(group_id) -> str:
 
 
 def _get_class_time_text(group_and_teacher, class_time_list: list) -> str:
-    text = f'{group_and_teacher[0]} - 🇺🇸 {group_and_teacher[1]}\n' \
-           f'______время_занятий________\n'
+    text = f'{group_and_teacher[0]} - 🇺🇸 {group_and_teacher[1]}\n______время_занятий________\n'
     for class_time_tuple in class_time_list:
         class_time = [*class_time_tuple]
-        text = text + f'{class_time[2].strftime("%A c %H:%M")} до {class_time[3].strftime("%H:%M")}\n' \
-                      f'{class_time[1]}\n_______________\n'
+        text = text + _get_time_room_text(start_time=class_time[2], end_time=class_time[3], room=class_time[1])
     return text
+
+
+def _get_time_room_text(start_time: datetime, end_time: datetime, room: str) -> str:
+    text = f'{start_time.strftime("%A c %H:%M")} до {end_time.strftime("%H:%M")}\n{room}\n_______________\n'
+    return text
+
+
+print(get_schedule_teacher(1))
+
+get_teacher_list()

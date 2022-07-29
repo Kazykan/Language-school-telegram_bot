@@ -4,7 +4,7 @@ from aiogram import Bot, Dispatcher, executor, types
 from aiogram.types import ReplyKeyboardRemove, ReplyKeyboardMarkup, KeyboardButton,\
     InlineKeyboardMarkup, InlineKeyboardButton
 
-from main import get_group_list, get_sql_class_time_list
+from main import get_group_list, get_sql_class_time_list, get_teacher_list, get_schedule_teacher
 
 bot = Bot(token=TELEGRAM_TOKEN)  # Объект бота
 dp = Dispatcher(bot)  # Диспетчер для бота
@@ -101,9 +101,20 @@ async def get_list_class_time(message: types.Message):
     """Время занятий конкретной группы"""
     group_id = int(message.text[10:])
     class_time_text = get_sql_class_time_list(group_id)
-    print(class_time_text)
-    answer_message = class_time_text
-    await message.answer(answer_message)
+    await message.answer(class_time_text)
+
+
+@dp.message_handler(commands=['2'])
+async def process_command_2(message: types.Message):
+    await message.reply(get_teacher_list(), reply_markup=inline_kb1)
+
+
+@dp.message_handler(lambda message: message.text.startswith('/schedule'))
+async def get_schedule_teachers(message: types.Message):
+    """Время занятий конкретного преподавателя"""
+    teacher_name = int(message.text[9:])
+    schedule_teacher_text = get_schedule_teacher(teacher_name)
+    await message.answer(schedule_teacher_text)
 
 
 if __name__ == "__main__":
