@@ -1,16 +1,9 @@
-from dataclasses import dataclass
-from tokenize import group
-from typing import Type
-from unicodedata import name
+
 from sqlalchemy import  Column, create_engine, MetaData, Table, String, Integer, Text, DateTime, Boolean, ForeignKey, insert, Time, Date
 from datetime import datetime, timedelta
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import Session, relationship
-from sqlalchemy.sql import select
-from typing import NamedTuple
 
-
-from business import add_time
 
 engine = create_engine('sqlite:///sqlite3.db')
 
@@ -57,6 +50,7 @@ class User(Base):
     description = Column(Text())
     birthday = Column(Date())
     phone_number = Column(String(12))
+    is_active = Column(Boolean, default=True)
     created_on = Column(DateTime(), default=datetime.now)
     updated_on = Column(DateTime(), default=datetime.now, onupdate=datetime.now)
 
@@ -97,7 +91,7 @@ Base.metadata.create_all(engine)
 
 # t2 = Teacher(
 #     first_name = 'Евгения',
-#     last_name = 'Джад',
+#     last_name = 'Верещагина',
 #     town = 'Ставрополь',
 # )
 # session.add(t2)
@@ -260,23 +254,28 @@ Base.metadata.create_all(engine)
 # session.commit()
 
 
-@dataclass(slots=True, frozen=True)
-class GroupAdd:
-    name: str
-    quota: int
-    price: int
-    duration: int
-    description: str
-    grade: str
-    teacher_id: int
+# @dataclass(slots=True, frozen=True)
+# class GroupAdd:
+#     name: str
+#     quota: int
+#     price: int
+#     duration: int
+#     description: str
+#     grade: str
+#     teacher_id: int
 
 
-def get_teacher_list():
+def get_teacher_list(schedule):
     teacher_list = session.query(Teacher.last_name, Teacher.first_name, Teacher.id).all()
     text = f'Список преподавателей:'
-    for teacher in teacher_list:
-        text = text + f'\n{teacher[0]} {teacher[1]} расписание /schedule{teacher[2]}\n__________'
-    return text
+    if schedule == 1:
+        for teacher in teacher_list:
+            text = text + f'\n{teacher[0]} {teacher[1]} расписание /schedule{teacher[2]}\n__________'
+        return text
+    else:
+        for teacher in teacher_list:
+            text = text + f'\n{teacher[2]}. {teacher[0]} {teacher[1]}'
+        return text
 
 
 def get_schedule_teacher(teacher_id: int):
@@ -293,14 +292,12 @@ def get_schedule_teacher(teacher_id: int):
         teacher_group_list.append([*room_id])
         teacher_group_list[index].append(get_classroom_name(room_id[0]))
         index += 1
-    print(teacher_group_list)
     text = _get_schedule_teacher_text(teacher_group_list)
     return text
 
 
 def get_classroom_name(id_classroom):
     class_room = session.query(ClassRoom.name).filter(ClassRoom.id == id_classroom).scalar()
-    print(class_room)
     return class_room
 
 
@@ -311,21 +308,24 @@ def _get_schedule_teacher_text(teacher_group_list: list) -> str:
     return text
 
 
-def get_group_list():
+def get_group_list(schedule: bool) -> str:
     """Получаем список групп, распаковываем кортеж + добавляем в конец кол-во учеников в группе"""
     group_tuple = session.query(Group.id, Group.name, Group.quota, Teacher.first_name).join(Teacher).all()
     group_list = tuple_to_list_add_user_count(group_tuple=group_tuple)
-    group_text = get_group_text(group_list)
+    group_text = get_group_text(group_list, schedule)
     return group_text
 
 
-def get_group_text(group_list: list) -> str:
+def get_group_text(group_list: list, schedule: bool) -> str:
     group_text = 'Список групп:\n'
     for lists in group_list:
-        group_text = group_text + f'{lists[1]} - 🇺🇸 {lists[3]}\n' \
-                                  f'Кол-во мест в группе: {lists[2]} - свободно мест {lists[2] - lists[4]}\n' \
-                                  f'📅 Время занятий /classtime{lists[0]}\n'\
-                                  f'_______________\n'
+        if not schedule:
+            group_text = group_text + f'{lists[0]}. '
+        group_text = group_text + f'{lists[1]} - 🇺🇸 {lists[3]}\n'
+        if schedule:
+            group_text = group_text + f'Кол-во мест в группе: {lists[2]} - свободно мест {lists[2] - lists[4]}\n'\
+                                      f'📅 Время занятий /classtime{lists[0]}\n'\
+                                      f'_______________\n'
     return group_text
 
 
@@ -347,7 +347,7 @@ def tuple_to_list_add_user_count(group_tuple: list) -> list:
     group_list = []
     for group_id in group_tuple:
         group_list.append([*group_id])
-        group_list[index].append(session.query(User).filter(User.group_id == group_id[0]).count())
+        group_list[index].append(session.query(User.id).filter(User.group_id == group_id[0]).count())
         index += 1
     return group_list
 
@@ -358,25 +358,6 @@ def get_user_free() -> list:
         User.id, User.first_name, User.last_name, User.birthday
     ).filter(User.group_id == None).all()
     return user_list
-
-
-def create_group(name: str, quota: int, price: int, duration: int, grade: str, description: str):
-    try:
-        g = Group(
-            name=name,
-            quota=quota,
-            price=price,
-            duration=duration,
-            grade=grade,
-            description=description,
-        )
-        session.add(g)
-        session.commit()
-
-        group_add_now = session.query(Group.id, Group.name, Group.quota, Group.price, Group.grade, Group.description).filter(Group.name == name).get()
-        return group_add_now
-    except Exception:
-        return f'Ошибка ввода данных'
 
 
 def get_sql_class_time_list(group_id) -> str:
@@ -401,6 +382,54 @@ def _get_time_room_text(start_time: datetime, end_time: datetime, room: str) -> 
     return text
 
 
-print(get_schedule_teacher(1))
+def create_new_group(name: str, quota: int, price: int, duration: int, description: str, grade: str, teacher_id: int):
+    try:
+        groups = Group(
+            name=str(name),
+            quota=int(quota),
+            price=int(price),
+            duration=int(duration),
+            description=str(description),
+            grade=str(grade),
+            teacher_id=int(teacher_id),
+        )
+        session.add(groups)
+        session.commit()
+        return f'Группа создана'
+    except ValueError as e:
+        return f'{create_new_group.__qualname__} ошибка ввода данных'
 
-get_teacher_list()
+
+def create_new_user(first_name: str, last_name: str, description: str, phone_number: str,
+                    email: str = None, town: str = None, birthday: str = None, group_id: int = None):
+    try:
+        users = User(
+            first_name=str(first_name),
+            last_name=str(last_name),
+            email=str(email),
+            town=str(town),
+            description=str(description),
+            birthday=birthday,
+            phone_number=str(phone_number),
+            group_id=int(group_id)
+        )
+        session.add(users)
+        session.commit()
+    except ValueError as e:
+        return f'{create_new_user.__qualname__} ошибка ввода данных'
+
+
+# print(get_schedule_teacher(1))
+# get_teacher_list(schedule=2)
+# print(get_group_list(schedule=True))
+# print(session.query(User.group_id, User.first_name, User.last_name).all())
+# print(session.query(User.id).filter(User.group_id == 1).count())
+
+# print(create_new_group(name='dfsdf', quota='fdsfsdf', price='fdsfs', duration=564, description='fsdfs', grade='fsdfs', teacher_id=1))
+
+# print(session.query(Group.id, Group.name, Group.quota, Group.price, Group.duration).all())
+#
+# i = session.query(Group).filter(Group.id == 6).delete()
+# session.commit()
+#
+# print(session.query(Group.id, Group.name, Group.quota, Group.price, Group.duration).all())
