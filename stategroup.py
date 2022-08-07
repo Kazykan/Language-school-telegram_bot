@@ -21,3 +21,10 @@ class UserStatesGroup(StatesGroup):
     birthday = State()
     phone_number = State()
     group_id = State()
+
+
+class ClassTimeStatesGroup(StatesGroup):
+    """Машина состояний для работы опросника по добавлению времени занятий в БД"""
+    group_id = State()
+    class_room_id = State()
+    start_time = State()

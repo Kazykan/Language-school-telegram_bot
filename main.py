@@ -1,16 +1,24 @@
+import sqlite3
 
 from sqlalchemy import  Column, create_engine, MetaData, Table, String, Integer, Text, DateTime, Boolean, ForeignKey, insert, Time, Date
 from datetime import datetime, timedelta
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import Session, relationship
 
+"""Добавление еще одного столбца в таблицу"""
+"""con = sqlite3.connect('sqlite3.db')
+c = con.cursor()
+c.execute("ALTER TABLE user ADD COLUMN is_active 'bool'")
+con.commit()
+c.close()"""
+
 
 engine = create_engine('sqlite:///sqlite3.db')
 
 session = Session(bind=engine)
-
 Base = declarative_base()
 metadata = Base.metadata
+
 
 
 class Teacher(Base):
@@ -79,6 +87,8 @@ class ClassTime(Base):
 
 
 Base.metadata.create_all(engine)
+
+
 
 
 # t1 = Teacher(
@@ -265,6 +275,14 @@ Base.metadata.create_all(engine)
 #     teacher_id: int
 
 
+def get_class_rooms_list():
+    class_rooms_tuple = session.query(ClassRoom.id, ClassRoom.name).all()
+    text = f'Список кабинетов:'
+    for room in class_rooms_tuple:
+        text = text + f'\n{room[0]}. {room[1]}'
+    return class_rooms_tuple
+
+
 def get_teacher_list(schedule):
     teacher_list = session.query(Teacher.last_name, Teacher.first_name, Teacher.id).all()
     text = f'Список преподавателей:'
@@ -308,7 +326,7 @@ def _get_schedule_teacher_text(teacher_group_list: list) -> str:
     return text
 
 
-def get_group_list(schedule: bool) -> str:
+def get_groups_list(schedule: bool) -> str:
     """Получаем список групп, распаковываем кортеж + добавляем в конец кол-во учеников в группе"""
     group_tuple = session.query(Group.id, Group.name, Group.quota, Teacher.first_name).join(Teacher).all()
     group_list = tuple_to_list_add_user_count(group_tuple=group_tuple)
@@ -360,25 +378,30 @@ def get_user_free() -> list:
     return user_list
 
 
-def get_sql_class_time_list(group_id) -> str:
+def get_sql_class_time_list(group_id, edit: bool) -> str:
     """Получаем время занятий для группы"""
     class_time_list = session.query(ClassTime.id, ClassRoom.name, ClassTime.start_time, ClassTime.end_time)\
         .join(ClassRoom).filter(ClassTime.group_id == group_id).group_by(ClassTime.start_time).all()
-    group_and_teacher = session.query(Group.name, Teacher.first_name).join(Group).filter(Group.id == group_id).all()[0]
-    text = _get_class_time_text([*group_and_teacher], class_time_list)
-    return text
+    if class_time_list:
+        group_and_teacher = session.query(Group.name, Teacher.first_name).join(Group).filter(Group.id == group_id).all()[0]
+        text = _get_class_time_text([*group_and_teacher], class_time_list, edit)
+        return text
+    else:
+        return f'Нет расписания'
 
 
-def _get_class_time_text(group_and_teacher, class_time_list: list) -> str:
+def _get_class_time_text(group_and_teacher, class_time_list: list, edit: bool) -> str:
     text = f'{group_and_teacher[0]} - 🇺🇸 {group_and_teacher[1]}\n______время_занятий________\n'
     for class_time_tuple in class_time_list:
         class_time = [*class_time_tuple]
         text = text + _get_time_room_text(start_time=class_time[2], end_time=class_time[3], room=class_time[1])
+        if edit:
+            text = text + f'удалить - /del_ct#{class_time[0]} \n_______________\n'
     return text
 
 
 def _get_time_room_text(start_time: datetime, end_time: datetime, room: str) -> str:
-    text = f'{start_time.strftime("%A c %H:%M")} до {end_time.strftime("%H:%M")}\n{room}\n_______________\n'
+    text = f'{start_time.strftime("%A c %H:%M")} до {end_time.strftime("%H:%M")}\n{room}\n'
     return text
 
 
@@ -400,7 +423,7 @@ def create_new_group(name: str, quota: int, price: int, duration: int, descripti
         return f'{create_new_group.__qualname__} ошибка ввода данных'
 
 
-def create_new_user(first_name: str, last_name: str, description: str, phone_number: str,
+def create_new_user(first_name: str, last_name: str, description: str, phone_number: str, is_active: bool,
                     email: str = None, town: str = None, birthday: str = None, group_id: int = None):
     try:
         users = User(
@@ -411,7 +434,8 @@ def create_new_user(first_name: str, last_name: str, description: str, phone_num
             description=str(description),
             birthday=birthday,
             phone_number=str(phone_number),
-            group_id=int(group_id)
+            is_active=bool(is_active),
+            group_id=int(group_id),
         )
         session.add(users)
         session.commit()
@@ -422,12 +446,13 @@ def create_new_user(first_name: str, last_name: str, description: str, phone_num
 # print(get_schedule_teacher(1))
 # get_teacher_list(schedule=2)
 # print(get_group_list(schedule=True))
-# print(session.query(User.group_id, User.first_name, User.last_name).all())
+# print(session.query(User.group_id, User.first_name, User.last_name, User.is_active).all())
 # print(session.query(User.id).filter(User.group_id == 1).count())
-
+# print(get_sql_class_time_list(group_id=4, edit=True))
+# print(session.query(Group.id, Group.name, Group.teacher_id, Group.grade).filter(Group.id == 5).all())
 # print(create_new_group(name='dfsdf', quota='fdsfsdf', price='fdsfs', duration=564, description='fsdfs', grade='fsdfs', teacher_id=1))
 
-# print(session.query(Group.id, Group.name, Group.quota, Group.price, Group.duration).all())
+print(session.query(ClassRoom.id, ClassRoom.name, ClassRoom.location).all())
 #
 # i = session.query(Group).filter(Group.id == 6).delete()
 # session.commit()

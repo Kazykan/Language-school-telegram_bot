@@ -39,6 +39,7 @@ class User(Base):
     description = Column(Text())
     birthday = Column(Date())
     phone_number = Column(String(12))
+    is_active = Column(Boolean, default=True)
     created_on = Column(DateTime(), default=datetime.now)
     updated_on = Column(DateTime(), default=datetime.now, onupdate=datetime.now)
 

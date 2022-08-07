@@ -8,9 +8,9 @@ from aiogram.types import ReplyKeyboardRemove, ReplyKeyboardMarkup, KeyboardButt
     InlineKeyboardMarkup, InlineKeyboardButton
 
 from aiogram.dispatcher import FSMContext
-from main import get_group_list, get_sql_class_time_list, get_teacher_list, get_schedule_teacher, create_new_group, \
-    create_new_user
-from stategroup import GroupStatesGroup, UserStatesGroup
+from main import get_groups_list, get_sql_class_time_list, get_teacher_list, get_schedule_teacher, create_new_group, \
+    create_new_user, get_class_rooms_list
+from stategroup import GroupStatesGroup, UserStatesGroup, ClassTimeStatesGroup
 
 bot = Bot(token=TELEGRAM_TOKEN)  # Объект бота
 dp = Dispatcher(bot,
@@ -23,7 +23,7 @@ def get_edit_all_data_ikb() -> InlineKeyboardMarkup:
     ikb = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton('Добавить группу', callback_data='add_new_groups')],
         [InlineKeyboardButton('Добавить ученика', callback_data='add_new_user')],
-        [InlineKeyboardButton('Добавить время занятий', callback_data='ass_new_class_time')],
+        [InlineKeyboardButton('Добавить время занятий', callback_data='add_new_class_time')],
     ])
     return ikb
 
@@ -65,7 +65,7 @@ async def cmd_edit_all_data(message: types.Message):
 
 @dp.message_handler(commands=['1'])
 async def process_command_1(message: types.Message):
-    await message.reply(get_group_list(schedule=True))
+    await message.reply(get_groups_list(schedule=True))
 
 
 @dp.callback_query_handler(lambda c: c.data == 'button1')
@@ -78,7 +78,7 @@ async def process_callback_button1(callback_query: types.CallbackQuery):
 async def get_list_class_time(message: types.Message):
     """Время занятий конкретной группы"""
     group_id = int(message.text[10:])
-    class_time_text = get_sql_class_time_list(group_id)
+    class_time_text = get_sql_class_time_list(group_id, edit=False)
     await message.answer(class_time_text)
 
 
@@ -220,7 +220,7 @@ async def handle_group_name(message: types.Message, state: FSMContext) -> None:
     async with state.proxy() as data:
         data['phone_number'] = message.text
     await message.reply(f'Выберите группу из списка. Напишите номер группы. Пример: 2\n'
-                        f'{get_group_list(schedule=False)}')
+                        f'{get_groups_list(schedule=False)}')
     await UserStatesGroup.next()
 
 
@@ -229,12 +229,40 @@ async def handle_group_name(message: types.Message, state: FSMContext) -> None:
     async with state.proxy() as data:
         data['group_id'] = message.text
     create_new_user(first_name=data['first_name'], last_name=data['last_name'],
-                    email=data['email'], town=data['town'],
-                    description=data['description'], birthday=data['birthday'],
-                    phone_number=data['phone_number'], group_id=data['group_id'])
+                    town=data['town'], description=data['description'], birthday=data['birthday'],
+                    phone_number=data['phone_number'], group_id=data['group_id'], is_active=True)
 
     await message.reply('Спасибо пользователь создан', reply_markup=get_start_kb())
     await state.finish()
+
+
+@dp.callback_query_handler(text='add_new_class_time')
+async def cb_add_new_user(callback: types.CallbackQuery) -> None:
+    """Добавляем время занятий для группы"""
+    await callback.message.delete()
+    await callback.message.answer(f'Введите номер группы просто цифру. Пример: 5\n{get_groups_list(schedule=False)}',
+                                  reply_markup=get_cancel_kb())
+    await ClassTimeStatesGroup.group_id.set()
+
+
+@dp.message_handler(state=ClassTimeStatesGroup.group_id)
+async def handle_group_name(message: types.Message, state: FSMContext) -> None:
+    async with state.proxy() as data:
+        data['group_id'] = message.text
+
+    await message.reply(f'{get_sql_class_time_list(data["group_id"], edit=True)} Введите номер кабинета. Пример 1\n'
+                        f'{get_class_rooms_list()}')
+    await UserStatesGroup.next()
+
+
+@dp.message_handler(state=ClassTimeStatesGroup.class_room_id)
+async def handle_group_name(message: types.Message, state: FSMContext) -> None:
+    async with state.proxy() as data:
+        data['class_room_id'] = message.text
+
+    await message.reply(f'Введите время начала занятий в формате день недели цифрой 1-пн, 2-вт, 3-ср, далее 09-00.'
+                        f'Пример 5 17-30\n')
+    await UserStatesGroup.next()
 
 
 if __name__ == "__main__":

@@ -11,6 +11,3 @@ def add_date(dates: str) -> date:
     temp = dates.split('.')
     edit_date = date(year=int(temp[2]), month=int(temp[1]), day=int(temp[0]))
     return edit_date
-
-
-print(add_date('23.11.1956'))
