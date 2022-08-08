@@ -275,6 +275,11 @@ Base.metadata.create_all(engine)
 #     teacher_id: int
 
 
+def get_one_group(group_id: int) -> list:
+    group_list = session.query(Group.id, Group.duration).filter(Group.id == group_id).all()[0]
+    return group_list
+
+
 def get_class_rooms_list():
     class_rooms_tuple = session.query(ClassRoom.id, ClassRoom.name).all()
     text = f'Список кабинетов:'
@@ -443,6 +448,12 @@ def create_new_user(first_name: str, last_name: str, description: str, phone_num
         return f'{create_new_user.__qualname__} ошибка ввода данных'
 
 
+def check_class_time_busy(start_time: datetime, end_time: datetime, class_room_id: int) -> list:
+    """Проверка занят кабинет на это время и если занять то какими группами реализовать"""
+    pass
+
+
+
 # print(get_schedule_teacher(1))
 # get_teacher_list(schedule=2)
 # print(get_group_list(schedule=True))
@@ -452,8 +463,8 @@ def create_new_user(first_name: str, last_name: str, description: str, phone_num
 # print(session.query(Group.id, Group.name, Group.teacher_id, Group.grade).filter(Group.id == 5).all())
 # print(create_new_group(name='dfsdf', quota='fdsfsdf', price='fdsfs', duration=564, description='fsdfs', grade='fsdfs', teacher_id=1))
 
-print(session.query(ClassRoom.id, ClassRoom.name, ClassRoom.location).all())
-#
+# print(session.query(ClassRoom.id, ClassRoom.name, ClassRoom.location).all())
+# print(session.query(Group.id, Group.duration).filter(Group.id == 2).all()[0])
 # i = session.query(Group).filter(Group.id == 6).delete()
 # session.commit()
 #

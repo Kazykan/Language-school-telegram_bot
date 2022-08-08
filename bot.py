@@ -1,6 +1,8 @@
-from aiogram.contrib.fsm_storage.memory import MemoryStorage
+from datetime import timedelta
 
-from business import add_date
+from aiogram.contrib.fsm_storage.memory import MemoryStorage
+import re
+from business import add_date, add_time
 from config import TELEGRAM_TOKEN
 import logging
 from aiogram import Bot, Dispatcher, executor, types
@@ -9,7 +11,7 @@ from aiogram.types import ReplyKeyboardRemove, ReplyKeyboardMarkup, KeyboardButt
 
 from aiogram.dispatcher import FSMContext
 from main import get_groups_list, get_sql_class_time_list, get_teacher_list, get_schedule_teacher, create_new_group, \
-    create_new_user, get_class_rooms_list
+    create_new_user, get_class_rooms_list, get_one_group
 from stategroup import GroupStatesGroup, UserStatesGroup, ClassTimeStatesGroup
 
 bot = Bot(token=TELEGRAM_TOKEN)  # Объект бота
@@ -248,7 +250,7 @@ async def cb_add_new_user(callback: types.CallbackQuery) -> None:
 @dp.message_handler(state=ClassTimeStatesGroup.group_id)
 async def handle_group_name(message: types.Message, state: FSMContext) -> None:
     async with state.proxy() as data:
-        data['group_id'] = message.text
+        data['group_id'] = int(message.text)
 
     await message.reply(f'{get_sql_class_time_list(data["group_id"], edit=True)} Введите номер кабинета. Пример 1\n'
                         f'{get_class_rooms_list()}')
@@ -259,6 +261,22 @@ async def handle_group_name(message: types.Message, state: FSMContext) -> None:
 async def handle_group_name(message: types.Message, state: FSMContext) -> None:
     async with state.proxy() as data:
         data['class_room_id'] = message.text
+
+    await message.reply(f'Введите время начала занятий в формате день недели цифрой 1-пн, 2-вт, 3-ср, далее 09-00.\n'
+                        f'Пример: 5 17-30\n')
+    await UserStatesGroup.next()
+
+
+@dp.message_handler(state=ClassTimeStatesGroup.start_time)
+async def handle_group_name(message: types.Message, state: FSMContext) -> None:
+    try:
+        async with state.proxy() as data:
+            times = re.split(' |-', message.text)
+            data['start_time'] = add_time(day=times[0], hour=times[1], minute=times[2])
+            duration = get_one_group(group_id=data['group_id'])[1]
+            data['end_time'] = data['start_time'] + timedelta(minutes=duration)
+    except ValueError as e:
+        await message.reply(f'Не верно введены данные')
 
     await message.reply(f'Введите время начала занятий в формате день недели цифрой 1-пн, 2-вт, 3-ср, далее 09-00.'
                         f'Пример 5 17-30\n')
