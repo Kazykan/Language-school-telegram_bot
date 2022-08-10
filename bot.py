@@ -11,7 +11,7 @@ from aiogram.types import ReplyKeyboardRemove, ReplyKeyboardMarkup, KeyboardButt
 
 from aiogram.dispatcher import FSMContext
 from main import get_groups_list, get_sql_class_time_list, get_teacher_list, get_schedule_teacher, create_new_group, \
-    create_new_user, get_class_rooms_list, get_one_group
+    create_new_user, get_class_rooms_list, get_one_group, check_class_time_busy
 from stategroup import GroupStatesGroup, UserStatesGroup, ClassTimeStatesGroup
 
 bot = Bot(token=TELEGRAM_TOKEN)  # Объект бота
@@ -260,7 +260,7 @@ async def handle_group_name(message: types.Message, state: FSMContext) -> None:
 @dp.message_handler(state=ClassTimeStatesGroup.class_room_id)
 async def handle_group_name(message: types.Message, state: FSMContext) -> None:
     async with state.proxy() as data:
-        data['class_room_id'] = message.text
+        data['class_room_id'] = int(message.text)
 
     await message.reply(f'Введите время начала занятий в формате день недели цифрой 1-пн, 2-вт, 3-ср, далее 09-00.\n'
                         f'Пример: 5 17-30\n')
@@ -277,6 +277,11 @@ async def handle_group_name(message: types.Message, state: FSMContext) -> None:
             data['end_time'] = data['start_time'] + timedelta(minutes=duration)
     except ValueError as e:
         await message.reply(f'Не верно введены данные')
+    check_class_time_list = check_class_time_busy(start_time=data['start_time'], end_time=data['end_time'],
+                                                  class_room_id=data['class_room_id'], group_id=data['group_id'])
+    if check_class_time_list[0]:
+        create_new_class_time
+
 
     await message.reply(f'Введите время начала занятий в формате день недели цифрой 1-пн, 2-вт, 3-ср, далее 09-00.'
                         f'Пример 5 17-30\n')

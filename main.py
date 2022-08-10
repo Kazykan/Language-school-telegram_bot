@@ -1,6 +1,7 @@
 import sqlite3
 
-from sqlalchemy import  Column, create_engine, MetaData, Table, String, Integer, Text, DateTime, Boolean, ForeignKey, insert, Time, Date
+from sqlalchemy import Column, create_engine, MetaData, Table, String, Integer, Text, DateTime, Boolean,\
+    ForeignKey, insert, Time, Date, or_
 from datetime import datetime, timedelta
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import Session, relationship
@@ -448,12 +449,50 @@ def create_new_user(first_name: str, last_name: str, description: str, phone_num
         return f'{create_new_user.__qualname__} ошибка ввода данных'
 
 
-def check_class_time_busy(start_time: datetime, end_time: datetime, class_room_id: int) -> list:
-    """Проверка занят кабинет на это время и если занять то какими группами реализовать"""
-    pass
+def check_class_time_busy(start_time: datetime, end_time: datetime, class_room_id: int, group_id: int) -> list:
+    """Проверка занят кабинет на это время и если занять то какими группами"""
+    time_busy_at_cr = session.query(ClassTime.id, ClassTime.class_room_id, ClassTime.start_time, ClassTime.end_time)\
+        .filter(or_(ClassTime.start_time.between(start_time, end_time),
+                ClassTime.end_time.between(start_time, end_time)),
+                ClassTime.class_room_id == class_room_id).order_by(ClassTime.start_time).all()
+    check_list = []
+    teacher_id = int(session.query(Group.teacher_id).filter(Group.id == group_id).scalar())
+    time_busy_at_teacher = session.query(
+        ClassTime.id, ClassTime.class_room_id, Group.id, ClassTime.start_time, ClassTime.end_time)\
+        .join(Group).filter(or_(ClassTime.start_time.between(start_time, end_time),
+                                ClassTime.end_time.between(start_time, end_time)),
+                            Group.teacher_id == teacher_id).order_by(ClassTime.start_time).all()
+    if time_busy_at_cr or time_busy_at_teacher:
+        check_list.extend([False, time_busy_at_cr, time_busy_at_teacher])
+        return check_list
+    else:
+        check_list.extend([True, time_busy_at_cr, time_busy_at_teacher])
+        create_new_class_time(start_time=start_time, end_time=end_time, class_room_id=class_room_id, group_id=group_id)
+        return check_list
 
 
+def create_new_class_time(start_time: datetime, end_time: datetime, class_room_id: int, group_id: int) -> str:
+    try:
+        class_time_add = ClassTime(
+            start_time=start_time,
+            end_time=end_time,
+            group_id=int(group_id),
+            class_room_id=int(class_room_id),
+        )
+        session.add(class_time_add)
+        session.commit()
+        return f'Время занятий добавлено'
+    except ValueError as e:
+        return f'{create_new_class_time.__qualname__} ошибка ввода данных'
 
+start_times = datetime(year=2021, month=11, day=1, hour=11, minute=10)
+end_times = datetime(year=2021, month=11, day=7, hour=12, minute=45)
+print(check_class_time_busy(start_time=start_times, end_time=end_times, class_room_id=1, group_id=1))
+# print(session.query(ClassTime.id, ClassTime.class_room_id, ClassTime.start_time, ClassTime.end_time).filter(or_(
+#     ClassTime.start_time.between(start_times, end_time),
+#     ClassTime.end_time.between(start_times, end_time)),
+#     ClassTime.class_room_id == 1).order_by(ClassTime.start_time).all())
+# print(session.query(Group.teacher_id, Teacher.first_name).join(Teacher).filter(Group.id == 1).all())
 # print(get_schedule_teacher(1))
 # get_teacher_list(schedule=2)
 # print(get_group_list(schedule=True))
