@@ -402,7 +402,7 @@ def _get_class_time_text(group_and_teacher, class_time_list: list, edit: bool) -
         class_time = [*class_time_tuple]
         text = text + _get_time_room_text(start_time=class_time[2], end_time=class_time[3], room=class_time[1])
         if edit:
-            text = text + f'удалить - /del_ct#{class_time[0]} \n_______________\n'
+            text = text + f'удалить - /del_ct_{class_time[0]} \n_______________\n'
     return text
 
 

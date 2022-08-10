@@ -30,9 +30,19 @@ def get_edit_all_data_ikb() -> InlineKeyboardMarkup:
     return ikb
 
 
+def get_start_ikb() -> InlineKeyboardMarkup:
+    """Кнопки первые: Записаться, ученику, учителю"""
+    ikb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton('Записаться в группу 🇬🇧', callback_data='reservation')],
+        [InlineKeyboardButton('Ученику расписание 🗓', callback_data='user_schedule')],
+        [InlineKeyboardButton('Учителю 👨‍🏫', callback_data='edit')],
+    ])
+    return ikb
+
+
 def get_start_kb() -> ReplyKeyboardMarkup:
     kb = ReplyKeyboardMarkup(keyboard=[
-        [KeyboardButton('/edit')]
+        [KeyboardButton('/edit')],
     ], resize_keyboard=True)
     return kb
 
@@ -48,7 +58,7 @@ def get_cancel_kb() -> ReplyKeyboardMarkup:
 async def cmd_start(message: types.Message):
     await bot.send_message(chat_id=message.from_user.id,
                            text='Добро пожаловать!',
-                           reply_markup=get_start_kb())
+                           reply_markup=get_start_ikb())
 
 
 @dp.message_handler(commands=['cancel'], state='*')
