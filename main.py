@@ -466,8 +466,9 @@ def check_class_time_busy(start_time: datetime, end_time: datetime, class_room_i
         check_list.extend([False, time_busy_at_cr, time_busy_at_teacher])
         return check_list
     else:
-        check_list.extend([True, time_busy_at_cr, time_busy_at_teacher])
-        create_new_class_time(start_time=start_time, end_time=end_time, class_room_id=class_room_id, group_id=group_id)
+        text = create_new_class_time(start_time=start_time, end_time=end_time,
+                                     class_room_id=class_room_id, group_id=group_id)
+        check_list.extend([True, text])
         return check_list
 
 

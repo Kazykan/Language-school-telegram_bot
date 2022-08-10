@@ -254,7 +254,7 @@ async def handle_group_name(message: types.Message, state: FSMContext) -> None:
 
     await message.reply(f'{get_sql_class_time_list(data["group_id"], edit=True)} Введите номер кабинета. Пример 1\n'
                         f'{get_class_rooms_list()}')
-    await UserStatesGroup.next()
+    await ClassTimeStatesGroup.next()
 
 
 @dp.message_handler(state=ClassTimeStatesGroup.class_room_id)
@@ -264,7 +264,7 @@ async def handle_group_name(message: types.Message, state: FSMContext) -> None:
 
     await message.reply(f'Введите время начала занятий в формате день недели цифрой 1-пн, 2-вт, 3-ср, далее 09-00.\n'
                         f'Пример: 5 17-30\n')
-    await UserStatesGroup.next()
+    await ClassTimeStatesGroup.next()
 
 
 @dp.message_handler(state=ClassTimeStatesGroup.start_time)
@@ -272,7 +272,7 @@ async def handle_group_name(message: types.Message, state: FSMContext) -> None:
     try:
         async with state.proxy() as data:
             times = re.split(' |-', message.text)
-            data['start_time'] = add_time(day=times[0], hour=times[1], minute=times[2])
+            data['start_time'] = add_time(day=int(times[0]), hour=int(times[1]), minute=int(times[2]))
             duration = get_one_group(group_id=data['group_id'])[1]
             data['end_time'] = data['start_time'] + timedelta(minutes=duration)
     except ValueError as e:
@@ -280,12 +280,10 @@ async def handle_group_name(message: types.Message, state: FSMContext) -> None:
     check_class_time_list = check_class_time_busy(start_time=data['start_time'], end_time=data['end_time'],
                                                   class_room_id=data['class_room_id'], group_id=data['group_id'])
     if check_class_time_list[0]:
-        create_new_class_time
-
-
-    await message.reply(f'Введите время начала занятий в формате день недели цифрой 1-пн, 2-вт, 3-ср, далее 09-00.'
-                        f'Пример 5 17-30\n')
-    await UserStatesGroup.next()
+        await message.reply(check_class_time_list[1])
+        await state.finish()
+    else:
+        await message.reply(check_class_time_list[1])
 
 
 if __name__ == "__main__":
