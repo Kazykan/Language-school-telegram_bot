@@ -43,7 +43,9 @@ def get_start_ikb() -> InlineKeyboardMarkup:
 def get_start_kb() -> ReplyKeyboardMarkup:
     kb = ReplyKeyboardMarkup(keyboard=[
         [KeyboardButton('/edit')],
-    ], resize_keyboard=True)
+        [KeyboardButton('/start')],
+        [KeyboardButton('/back')],
+    ], resize_keyboard=True, row_width=True)
     return kb
 
 
@@ -75,9 +77,11 @@ async def cmd_edit_all_data(message: types.Message):
                          reply_markup=get_edit_all_data_ikb())
 
 
-@dp.message_handler(commands=['1'])
-async def process_command_1(message: types.Message):
-    await message.reply(get_groups_list(schedule=True))
+@dp.callback_query_handler(text='user_schedule')
+async def cb_add_new_groups(callback: types.CallbackQuery) -> None:
+    """Расписание для группы"""
+    await callback.message.delete()
+    await callback.message.answer(get_groups_list(schedule=True))
 
 
 @dp.callback_query_handler(lambda c: c.data == 'button1')
