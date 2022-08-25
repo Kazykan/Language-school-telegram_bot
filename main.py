@@ -450,17 +450,20 @@ def create_new_user(first_name: str, last_name: str, description: str, phone_num
 
 
 def check_class_time_busy(start_time: datetime, end_time: datetime, class_room_id: int, group_id: int) -> list:
-    """Проверка занят кабинет на это время и если занять то какими группами"""
+    """Проверка занят кабинет на это время и если занять то какими группами.
+    Прибавляем 1 минуту с начала занятий и отнимаем 1 минуту с конца занятий, т.к. занятия могут идти вплотную"""
+    start_time_add_1_minute = start_time + timedelta(minutes=1)
+    end_time_minus_1_minute = end_time - timedelta(minutes=1)
     time_busy_at_cr = session.query(ClassTime.id, ClassTime.class_room_id, ClassTime.start_time, ClassTime.end_time)\
-        .filter(or_(ClassTime.start_time.between(start_time, end_time),
-                ClassTime.end_time.between(start_time, end_time)),
+        .filter(or_(ClassTime.start_time.between(start_time_add_1_minute, end_time_minus_1_minute),
+                ClassTime.end_time.between(start_time_add_1_minute, end_time_minus_1_minute)),
                 ClassTime.class_room_id == class_room_id).order_by(ClassTime.start_time).all()
     check_list = []
     teacher_id = int(session.query(Group.teacher_id).filter(Group.id == group_id).scalar())
     time_busy_at_teacher = session.query(
         ClassTime.id, ClassTime.class_room_id, Group.id, ClassTime.start_time, ClassTime.end_time)\
-        .join(Group).filter(or_(ClassTime.start_time.between(start_time, end_time),
-                                ClassTime.end_time.between(start_time, end_time)),
+        .join(Group).filter(or_(ClassTime.start_time.between(start_time_add_1_minute, end_time_minus_1_minute),
+                                ClassTime.end_time.between(start_time_add_1_minute, end_time_minus_1_minute)),
                             Group.teacher_id == teacher_id).order_by(ClassTime.start_time).all()
     if time_busy_at_cr or time_busy_at_teacher:
         check_list.extend([False, time_busy_at_cr, time_busy_at_teacher])
@@ -485,6 +488,7 @@ def create_new_class_time(start_time: datetime, end_time: datetime, class_room_i
         return f'Время занятий добавлено'
     except ValueError as e:
         return f'{create_new_class_time.__qualname__} ошибка ввода данных'
+
 
 start_times = datetime(year=2021, month=11, day=1, hour=11, minute=10)
 end_times = datetime(year=2021, month=11, day=7, hour=12, minute=45)

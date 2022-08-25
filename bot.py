@@ -36,7 +36,7 @@ def get_start_ikb() -> InlineKeyboardMarkup:
         [InlineKeyboardButton('Записаться в группу 🇬🇧', callback_data='reservation')],
         [InlineKeyboardButton('Ученику расписание 🗓', callback_data='user_schedule')],
         [InlineKeyboardButton('Учителю 👨‍🏫', callback_data='edit')],
-    ])
+    ], reply_markup=ReplyKeyboardRemove())
     return ikb
 
 
@@ -45,7 +45,7 @@ def get_start_kb() -> ReplyKeyboardMarkup:
         [KeyboardButton('/edit')],
         [KeyboardButton('/start')],
         [KeyboardButton('/back')],
-    ], resize_keyboard=True, row_width=True)
+    ], resize_keyboard=True)
     return kb
 
 
@@ -68,13 +68,21 @@ async def cmd_cancel(message: types.Message, state: FSMContext):
     if state is None:
         return
     await state.finish()
-    await message.answer('Вы отменили действие...', reply_markup=get_start_kb())
+    await message.answer('Вы отменили действие...', reply_markup=get_start_ikb())
 
 
-@dp.message_handler(commands=['edit'])
-async def cmd_edit_all_data(message: types.Message):
-    await message.answer('Добавление данных:',
-                         reply_markup=get_edit_all_data_ikb())
+# @dp.message_handler(commands=['edit'])
+# async def cmd_edit_all_data(message: types.Message):
+#     await message.answer('Добавление данных:',
+#                          reply_markup=get_edit_all_data_ikb())
+
+
+@dp.callback_query_handler(text='edit')
+async def cb_add_new_groups(callback: types.CallbackQuery) -> None:
+    """Отработка кнопки учителю"""
+    await callback.message.delete()
+    await callback.message.answer('Добавление данных:',
+                                  reply_markup=get_edit_all_data_ikb())
 
 
 @dp.callback_query_handler(text='user_schedule')
@@ -82,12 +90,6 @@ async def cb_add_new_groups(callback: types.CallbackQuery) -> None:
     """Расписание для группы"""
     await callback.message.delete()
     await callback.message.answer(get_groups_list(schedule=True))
-
-
-@dp.callback_query_handler(lambda c: c.data == 'button1')
-async def process_callback_button1(callback_query: types.CallbackQuery):
-    await bot.answer_callback_query(callback_query.id)
-    await bot.send_message(callback_query.from_user.id, 'Нажата первая кнопка!')
 
 
 @dp.message_handler(lambda message: message.text.startswith('/classtime'))
@@ -122,6 +124,7 @@ async def cb_add_new_groups(callback: types.CallbackQuery) -> None:
 
 @dp.message_handler(state=GroupStatesGroup.name)
 async def handle_group_name(message: types.Message, state: FSMContext) -> None:
+    """Добавляем новую группу - 2 пункт"""
     async with state.proxy() as data:
         data['name'] = message.text
     await message.reply('Кол-во учеников в группе. Пример: 6')
@@ -130,6 +133,7 @@ async def handle_group_name(message: types.Message, state: FSMContext) -> None:
 
 @dp.message_handler(state=GroupStatesGroup.quota)
 async def handle_group_quota(message: types.Message, state: FSMContext) -> None:
+    """Добавляем новую группу - 3 пункт"""
     async with state.proxy() as data:
         data['quota'] = int(message.text)
     await message.reply('Стоимость занятия просто цифры без р. Пример: 650')
@@ -138,6 +142,7 @@ async def handle_group_quota(message: types.Message, state: FSMContext) -> None:
 
 @dp.message_handler(state=GroupStatesGroup.price)
 async def handle_group_price(message: types.Message, state: FSMContext) -> None:
+    """Добавляем новую группу - 4 пункт"""
     async with state.proxy() as data:
         data['price'] = int(message.text)
     await message.reply('Длительность занятия просто цифра в минутах. Пример: 60')
@@ -146,6 +151,7 @@ async def handle_group_price(message: types.Message, state: FSMContext) -> None:
 
 @dp.message_handler(state=GroupStatesGroup.duration)
 async def handle_group_duration(message: types.Message, state: FSMContext) -> None:
+    """Добавляем новую группу - 5 пункт"""
     async with state.proxy() as data:
         data['duration'] = int(message.text)
     await message.reply('Описание. Пример: -')
@@ -154,14 +160,16 @@ async def handle_group_duration(message: types.Message, state: FSMContext) -> No
 
 @dp.message_handler(state=GroupStatesGroup.description)
 async def handle_group_description(message: types.Message, state: FSMContext) -> None:
+    """Добавляем новую группу - 6 пункт"""
     async with state.proxy() as data:
         data['description'] = message.text
-    await message.reply('Какие школ. классы занимаются, цифры через пробел. Пример: 1, 2, 3')
+    await message.reply('Какие школ. классы занимаются, цифры через пробел. Пример: 1 2 3')
     await GroupStatesGroup.next()
 
 
 @dp.message_handler(state=GroupStatesGroup.grade)
 async def handle_group_grade(message: types.Message, state: FSMContext) -> None:
+    """Добавляем новую группу - 7 пункт"""
     async with state.proxy() as data:
         data['grade'] = message.text
     await message.reply(f'Кто ведет эту группу введите цифру препод.\n{get_teacher_list(schedule=2)}\n Пример: 1')
@@ -283,6 +291,7 @@ async def handle_group_name(message: types.Message, state: FSMContext) -> None:
 
 @dp.message_handler(state=ClassTimeStatesGroup.start_time)
 async def handle_group_name(message: types.Message, state: FSMContext) -> None:
+    """Добавляем время занятий для группы - проверка занято ли это время в кабинете и личное время преподавателя"""
     try:
         async with state.proxy() as data:
             times = re.split(' |-', message.text)
