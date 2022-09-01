@@ -493,23 +493,3 @@ def create_new_class_time(start_time: datetime, end_time: datetime, class_room_i
 start_times = datetime(year=2021, month=11, day=1, hour=11, minute=10)
 end_times = datetime(year=2021, month=11, day=7, hour=12, minute=45)
 print(check_class_time_busy(start_time=start_times, end_time=end_times, class_room_id=1, group_id=1))
-# print(session.query(ClassTime.id, ClassTime.class_room_id, ClassTime.start_time, ClassTime.end_time).filter(or_(
-#     ClassTime.start_time.between(start_times, end_time),
-#     ClassTime.end_time.between(start_times, end_time)),
-#     ClassTime.class_room_id == 1).order_by(ClassTime.start_time).all())
-# print(session.query(Group.teacher_id, Teacher.first_name).join(Teacher).filter(Group.id == 1).all())
-# print(get_schedule_teacher(1))
-# get_teacher_list(schedule=2)
-# print(get_group_list(schedule=True))
-# print(session.query(User.group_id, User.first_name, User.last_name, User.is_active).all())
-# print(session.query(User.id).filter(User.group_id == 1).count())
-# print(get_sql_class_time_list(group_id=4, edit=True))
-# print(session.query(Group.id, Group.name, Group.teacher_id, Group.grade).filter(Group.id == 5).all())
-# print(create_new_group(name='dfsdf', quota='fdsfsdf', price='fdsfs', duration=564, description='fsdfs', grade='fsdfs', teacher_id=1))
-
-# print(session.query(ClassRoom.id, ClassRoom.name, ClassRoom.location).all())
-# print(session.query(Group.id, Group.duration).filter(Group.id == 2).all()[0])
-# i = session.query(Group).filter(Group.id == 6).delete()
-# session.commit()
-#
-# print(session.query(Group.id, Group.name, Group.quota, Group.price, Group.duration).all())
