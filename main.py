@@ -21,7 +21,6 @@ Base = declarative_base()
 metadata = Base.metadata
 
 
-
 class Teacher(Base):
     __tablename__ = 'teacher'
     id = Column(Integer(), primary_key=True)
