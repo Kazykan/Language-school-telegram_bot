@@ -20,6 +20,11 @@ session = Session(bind=engine)
 Base = declarative_base()
 metadata = Base.metadata
 
+"""Отношения многие ко многим группы и класс ученика который учатся в этих группах"""
+group_grade = Table('group_grade',
+                    Column('group_id', Integer, ForeignKey('group.id'), primary_key=True),
+                    Column('grade_id', Integer, ForeignKey('grade.id'), primary_key=True))
+
 
 class Teacher(Base):
     __tablename__ = 'teacher'
@@ -42,10 +47,17 @@ class Group(Base):
     price = Column(Integer(),  nullable=False)
     duration = Column(Integer(),  nullable=False)
     description = Column(Text())
-    grade = Column(String(10), nullable=False)
 
     teacher_id = Column(Integer(), ForeignKey("teacher.id"))
     teacher = relationship('Teacher', backref="group")
+    grade = relationship('Grade', secondary=group_grade, backref='group')
+
+
+class Grade(Base):
+    """Класс в котором учиться ученик, 0 - дошкольник, 12 - студент, 13 - взрослый"""
+    __tablename__ = 'grade'
+    id = Column(Integer(), primary_key=True)
+    name = Column(Integer(), nullable=False)
 
 
 class User(Base):
@@ -112,7 +124,6 @@ Base.metadata.create_all(engine)
 #     quota = 6,
 #     price = 550,
 #     duration = 60,
-#     grade = '0, 1, 2',
 #     teacher_id = 1,
 # )
 # session.add(g1)
