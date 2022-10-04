@@ -1,3 +1,4 @@
+"""Машина состояний для работы опросников"""
 from aiogram.dispatcher.filters.state import StatesGroup, State
 
 

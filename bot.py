@@ -1,23 +1,22 @@
 from datetime import timedelta
+import logging
 
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
-import re
-from business import add_date, add_time
-from config import TELEGRAM_TOKEN
-import logging
 from aiogram import Bot, Dispatcher, executor, types
 from aiogram.types import ReplyKeyboardRemove, ReplyKeyboardMarkup, KeyboardButton,\
     InlineKeyboardMarkup, InlineKeyboardButton
-
 from aiogram.dispatcher import FSMContext
-from main import get_groups_list, get_sql_class_time_list, get_teacher_list, get_schedule_teacher, create_new_group, \
-    create_new_user, get_class_rooms_list, get_one_group, check_class_time_busy
+from business import get_groups_list, get_sql_class_time_list, get_teacher_list, \
+    create_new_group, create_new_user, get_class_rooms_list, get_one_group, check_class_time_busy, \
+    add_date, add_time, get_schedule_teacher
 from stategroup import GroupStatesGroup, UserStatesGroup, ClassTimeStatesGroup
+
+from config import TELEGRAM_TOKEN
 
 bot = Bot(token=TELEGRAM_TOKEN)  # Объект бота
 dp = Dispatcher(bot,
                 storage=MemoryStorage())  # Диспетчер для бота
-logging.basicConfig(level=logging.INFO)  # Включаем логирование, чтобы не пропустить важные сообщения
+logging.basicConfig(level=logging.INFO)  # Вкл логирование, чтобы не пропустить важные сообщения
 
 
 def get_edit_all_data_ikb() -> InlineKeyboardMarkup:
@@ -78,7 +77,7 @@ async def cmd_cancel(message: types.Message, state: FSMContext):
 
 
 @dp.callback_query_handler(text='edit')
-async def cb_add_new_groups(callback: types.CallbackQuery) -> None:
+async def cb_teacher_keyboard(callback: types.CallbackQuery) -> None:
     """Отработка кнопки учителю"""
     await callback.message.delete()
     await callback.message.answer('Добавление данных:',
@@ -86,7 +85,7 @@ async def cb_add_new_groups(callback: types.CallbackQuery) -> None:
 
 
 @dp.callback_query_handler(text='user_schedule')
-async def cb_add_new_groups(callback: types.CallbackQuery) -> None:
+async def cb_group_schedule(callback: types.CallbackQuery) -> None:
     """Расписание для группы"""
     await callback.message.delete()
     await callback.message.answer(get_groups_list(schedule=True))
@@ -102,6 +101,7 @@ async def get_list_class_time(message: types.Message):
 
 @dp.message_handler(commands=['2'])
 async def process_command_2(message: types.Message):
+    """Временная функция расписание учителя  -- удалить"""
     await message.reply(get_teacher_list(schedule=1))
 
 
@@ -170,8 +170,12 @@ async def handle_group_description(message: types.Message, state: FSMContext) ->
 @dp.message_handler(state=GroupStatesGroup.grade)
 async def handle_group_grade(message: types.Message, state: FSMContext) -> None:
     """Добавляем новую группу - 7 пункт"""
-    async with state.proxy() as data:
-        data['grade'] = message.text
+    try:
+        async with state.proxy() as data:
+            data['grade'] = [int(i) for i in message.text.split()]  # Разделяем и преобразуем в цифры
+    except ValueError:
+        await message.reply('Не верно введены данные\n'
+        'Какие школ. классы занимаются, цифры через пробел. Пример: 1 2 3')
     await message.reply(f'Кто ведет эту группу введите цифру препод.\n{get_teacher_list(schedule=2)}\n Пример: 1')
     await GroupStatesGroup.next()
 
@@ -183,7 +187,7 @@ async def handle_group_teacher_id(message: types.Message, state: FSMContext) -> 
         data['teacher_id'] = int(message.text)
     create_new_group(name=data['name'], quota=data['quota'],
                      price=data['price'], duration=data['duration'],
-                     description=data['description'], grade=data['grade'],
+                     description=data['description'], grades=data['grade'],
                      teacher_id=data['teacher_id'])
 
     await message.reply('Спасибо группа создана', reply_markup=get_start_kb())
@@ -200,7 +204,8 @@ async def cb_add_new_user(callback: types.CallbackQuery) -> None:
 
 
 @dp.message_handler(state=UserStatesGroup.first_name)
-async def handle_group_name(message: types.Message, state: FSMContext) -> None:
+async def cb_add_new_user_first_name(message: types.Message, state: FSMContext) -> None:
+    """Добавляем нового ученика"""
     async with state.proxy() as data:
         data['first_name'] = message.text
     await message.reply('Напишите фамилие ученика')
@@ -208,7 +213,8 @@ async def handle_group_name(message: types.Message, state: FSMContext) -> None:
 
 
 @dp.message_handler(state=UserStatesGroup.last_name)
-async def handle_group_name(message: types.Message, state: FSMContext) -> None:
+async def cb_add_new_user_last_name(message: types.Message, state: FSMContext) -> None:
+    """Добавляем нового ученика"""
     async with state.proxy() as data:
         data['last_name'] = message.text
     await message.reply('Напишите город')
@@ -216,7 +222,8 @@ async def handle_group_name(message: types.Message, state: FSMContext) -> None:
 
 
 @dp.message_handler(state=UserStatesGroup.town)
-async def handle_group_name(message: types.Message, state: FSMContext) -> None:
+async def cb_add_new_user_town(message: types.Message, state: FSMContext) -> None:
+    """Добавляем нового ученика"""
     async with state.proxy() as data:
         data['town'] = message.text
     await message.reply('Описание, ФИО родителей, ном. тел. родителей и прочее в произвольной форме')
@@ -224,7 +231,8 @@ async def handle_group_name(message: types.Message, state: FSMContext) -> None:
 
 
 @dp.message_handler(state=UserStatesGroup.description)
-async def handle_group_name(message: types.Message, state: FSMContext) -> None:
+async def cb_add_new_user_description(message: types.Message, state: FSMContext) -> None:
+    """Добавляем нового ученика"""
     async with state.proxy() as data:
         data['description'] = message.text
     await message.reply('День рождения в формате 25.11.1998')
@@ -232,7 +240,8 @@ async def handle_group_name(message: types.Message, state: FSMContext) -> None:
 
 
 @dp.message_handler(state=UserStatesGroup.birthday)
-async def handle_group_name(message: types.Message, state: FSMContext) -> None:
+async def cb_add_new_user_birthday(message: types.Message, state: FSMContext) -> None:
+    """Добавляем нового ученика"""
     async with state.proxy() as data:
         data['birthday'] = add_date(message.text)
     await message.reply('Номер телефона в формате 8 962 412 50 81')
@@ -240,7 +249,8 @@ async def handle_group_name(message: types.Message, state: FSMContext) -> None:
 
 
 @dp.message_handler(state=UserStatesGroup.phone_number)
-async def handle_group_name(message: types.Message, state: FSMContext) -> None:
+async def cb_add_new_user_phone_number(message: types.Message, state: FSMContext) -> None:
+    """Добавляем нового ученика"""
     async with state.proxy() as data:
         data['phone_number'] = message.text
     await message.reply(f'Выберите группу из списка. Напишите номер группы. Пример: 2\n'
@@ -249,7 +259,8 @@ async def handle_group_name(message: types.Message, state: FSMContext) -> None:
 
 
 @dp.message_handler(state=UserStatesGroup.group_id)
-async def handle_group_name(message: types.Message, state: FSMContext) -> None:
+async def cb_add_new_user_group_id(message: types.Message, state: FSMContext) -> None:
+    """Добавляем нового ученика - запускаем проверку и добавляем ученика"""
     async with state.proxy() as data:
         data['group_id'] = message.text
     create_new_user(first_name=data['first_name'], last_name=data['last_name'],
@@ -261,7 +272,7 @@ async def handle_group_name(message: types.Message, state: FSMContext) -> None:
 
 
 @dp.callback_query_handler(text='add_new_class_time')
-async def cb_add_new_user(callback: types.CallbackQuery) -> None:
+async def cb_add_new_classtime(callback: types.CallbackQuery) -> None:
     """Добавляем время занятий для группы"""
     await callback.message.delete()
     await callback.message.answer(f'Введите номер группы просто цифру. Пример: 5\n{get_groups_list(schedule=False)}',
@@ -270,7 +281,8 @@ async def cb_add_new_user(callback: types.CallbackQuery) -> None:
 
 
 @dp.message_handler(state=ClassTimeStatesGroup.group_id)
-async def handle_group_name(message: types.Message, state: FSMContext) -> None:
+async def cb_add_new_classtime_group_id(message: types.Message, state: FSMContext) -> None:
+    """Добавляем время занятий для группы"""
     async with state.proxy() as data:
         data['group_id'] = int(message.text)
 
@@ -280,17 +292,18 @@ async def handle_group_name(message: types.Message, state: FSMContext) -> None:
 
 
 @dp.message_handler(state=ClassTimeStatesGroup.class_room_id)
-async def handle_group_name(message: types.Message, state: FSMContext) -> None:
+async def cb_add_new_classtime_class_room_id(message: types.Message, state: FSMContext) -> None:
+    """Добавляем время занятий для группы"""
     async with state.proxy() as data:
         data['class_room_id'] = int(message.text)
 
-    await message.reply(f'Введите время начала занятий в формате день недели цифрой 1-пн, 2-вт, 3-ср, далее 09-00.\n'
-                        f'Пример: 5 17-30\n')
+    await message.reply('Введите время начала занятий в формате день недели цифрой 1-пн, 2-вт, 3-ср, далее 09-00.\n'
+                        'Пример: 5 17-30\n')
     await ClassTimeStatesGroup.next()
 
 
 @dp.message_handler(state=ClassTimeStatesGroup.start_time)
-async def handle_group_name(message: types.Message, state: FSMContext) -> None:
+async def cb_add_new_classtime_start_time(message: types.Message, state: FSMContext) -> None:
     """Добавляем время занятий для группы - проверка занято ли это время в кабинете и личное время преподавателя"""
     try:
         async with state.proxy() as data:
@@ -299,7 +312,7 @@ async def handle_group_name(message: types.Message, state: FSMContext) -> None:
             duration = get_one_group(group_id=data['group_id'])[1]
             data['end_time'] = data['start_time'] + timedelta(minutes=duration)
     except ValueError as e:
-        await message.reply(f'Не верно введены данные')
+        await message.reply('Не верно введены данные')
     check_class_time_list = check_class_time_busy(start_time=data['start_time'], end_time=data['end_time'],
                                                   class_room_id=data['class_room_id'], group_id=data['group_id'])
     if check_class_time_list[0]:

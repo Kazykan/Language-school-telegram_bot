@@ -1,10 +1,27 @@
-from email.policy import default
-from sqlalchemy import  Column, create_engine, MetaData, Table, String, Integer, Text, DateTime, Boolean, ForeignKey
-from datetime import datetime
+"""Не нужный модуль"""
 
-metadata = MetaData()
+from datetime import datetime
+from sqlalchemy import Column, create_engine, Table, String, Integer, Text, DateTime,\
+    Boolean, ForeignKey, Date
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import Session, relationship
+
+
+engine = create_engine('sqlite:///sqlite3.db')
+
+
+session = Session(bind=engine)
+Base = declarative_base()
+metadata = Base.metadata
+
+"""Отношения многие ко многим группы и класс ученика который учатся в этих группах"""
+group_grade = Table('group_grade',
+                    Column('group_id', Integer, ForeignKey('group.id'), primary_key=True),
+                    Column('grade_id', Integer, ForeignKey('grade.id'), primary_key=True))
+
 
 class Teacher(Base):
+    """Учитиля"""
     __tablename__ = 'teacher'
     id = Column(Integer(), primary_key=True)
     first_name = Column(String(15), nullable=False)
@@ -15,6 +32,7 @@ class Teacher(Base):
     created_on = Column(DateTime(), default=datetime.now)
     updated_on = Column(DateTime(), default=datetime.now, onupdate=datetime.now)
 
+
 class Group(Base):
     """Группы с максимальным кол-вом учеников, ценой и длительностью занятия"""
     __tablename__ = 'group'
@@ -24,12 +42,21 @@ class Group(Base):
     price = Column(Integer(),  nullable=False)
     duration = Column(Integer(),  nullable=False)
     description = Column(Text())
-    grade = Column(String(10), nullable=False)
 
     teacher_id = Column(Integer(), ForeignKey("teacher.id"))
     teacher = relationship('Teacher', backref="group")
+    grade = relationship('Grade', secondary=group_grade, backref='group')
+
+
+class Grade(Base):
+    """Класс в котором учиться ученик, 0 - дошкольник, 12 - студент, 13 - взрослый"""
+    __tablename__ = 'grade'
+    id = Column(Integer(), primary_key=True)
+    name = Column(Integer(), nullable=False)
+
 
 class User(Base):
+    """Ученики"""
     __tablename__ = 'user'
     id = Column(Integer, primary_key=True)
     first_name = Column(String(15), nullable=False)
@@ -46,7 +73,9 @@ class User(Base):
     group_id = Column(Integer(), ForeignKey("group.id"))
     group = relationship('Group', backref="user")
 
+
 class ClassRoom(Base):
+    """Кабинет может быть онлайн"""
     __tablename__ = 'class_room'
     id = Column(Integer(), primary_key=True)
     name = Column(String(100), nullable=False)
@@ -55,6 +84,7 @@ class ClassRoom(Base):
 
 
 class ClassTime(Base):
+    """Время занятий, занятия могут идти одна за одной"""
     __tablename__ = 'class_time'
     id = Column(Integer(), primary_key=True)
     start_time = Column(DateTime(), nullable=False)
@@ -67,72 +97,3 @@ class ClassTime(Base):
 
 
 Base.metadata.create_all(engine)
-
-
-button_hi = KeyboardButton('Привет 👋')
-
-greet_kb = ReplyKeyboardMarkup()
-greet_kb.add(button_hi)
-
-
-@dp.message_handler(commands=['start'])
-async def process_start_command(message: types.Message):
-    await message.reply('Привет!', reply_markup=greet_kb)
-
-
-greet_kb1 = ReplyKeyboardMarkup(resize_keyboard=True).add(button_hi)
-
-
-@dp.message_handler(commands=['hi1'])
-async def process_hi1_command(message: types.Message):
-    await message.reply('Первое - изменяем размер клавиатуры', reply_markup=greet_kb1)
-
-
-greet_kb2 = ReplyKeyboardMarkup(
-    resize_keyboard=True, one_time_keyboard=True
-).add(button_hi)
-
-
-@dp.message_handler(commands=['hi2'])
-async def process_hi2_command(message: types.Message):
-    await message.reply("Второе - прячем клавиатуру после одного нажатия", reply_markup=greet_kb2)
-
-
-button1 = KeyboardButton('1️⃣')
-button2 = KeyboardButton('2️⃣')
-button3 = KeyboardButton('3️⃣')
-
-markup3 = ReplyKeyboardMarkup().add(
-    button1).add(button2).add(button3)  # расставляет кнопки одну под одной
-
-markup4 = ReplyKeyboardMarkup().row(
-    button1, button2, button3
-)
-
-markup5 = ReplyKeyboardMarkup().row(
-    button1, button2, button3
-).add(KeyboardButton('Средний ряд'))
-
-button4 = KeyboardButton('4️⃣')
-button5 = KeyboardButton('5️⃣')
-button6 = KeyboardButton('6️⃣')
-markup5.row(button4, button5)
-markup5.insert(button6)
-
-
-@dp.message_handler(commands=['hi3'])
-async def process_hi3_command(message: types.Message):
-    await message.reply("Третье - добавляем больше кнопок", reply_markup=markup3)
-
-
-@dp.message_handler(commands=['hi4'])
-async def process_hi4_command(message: types.Message):
-    await message.reply("Четвертое - расставляем кнопки в ряд", reply_markup=markup4)
-
-
-@dp.message_handler(commands=['hi5'])
-async def process_hi5_command(message: types.Message):
-    await message.reply("Пятое - добавляем ряды кнопок", reply_markup=markup5)
-
-inline_btm_1 = InlineKeyboardButton("Первая кнопка!", callback_data='button1')
-inline_kb1 = InlineKeyboardMarkup().add(inline_btm_1)
