@@ -99,7 +99,7 @@ def get_group_text(group_list: list, schedule: bool) -> str:
                                       f'_______________\n'
     return group_text
 
-
+#  ____________________________Поправить___________________________________///////////////////////
 def get_group_grade(grade: int):
     """Получаем список групп по запросу цифры класса - grade"""
     grade_str = f'%{str(grade)}%'
@@ -140,7 +140,7 @@ def get_sql_class_time_list(group_id, edit: bool) -> str:
         text = _get_class_time_text([*group_and_teacher], class_time_list, edit)
         return text
     else:
-        return f'Нет расписания'
+        return 'Нет расписания'
 
 
 def _get_class_time_text(group_and_teacher, class_time_list: list, edit: bool) -> str:
@@ -149,7 +149,7 @@ def _get_class_time_text(group_and_teacher, class_time_list: list, edit: bool) -
         class_time = [*class_time_tuple]
         text = text + _get_time_room_text(start_time=class_time[2], end_time=class_time[3], room=class_time[1])
         if edit:
-            text = text + f'удалить - /del_ct_{class_time[0]} \n_______________\n'
+            text = text + f'удалить - /del_ct_{class_time[0]} \n{"_" * 15}\n'
     return text
 
 
@@ -194,25 +194,25 @@ def create_new_user(first_name: str, last_name: str, description: str, phone_num
         )
         session.add(users)
         session.commit()
-    except ValueError as e:
+    except ValueError:
         return f'{create_new_user.__qualname__} ошибка ввода данных'
 
 
 def check_class_time_busy(start_time: datetime, end_time: datetime, class_room_id: int, group_id: int) -> list:
     """Проверка занят кабинет на это время и если занять то какими группами.
     Прибавляем 1 минуту с начала занятий и отнимаем 1 минуту с конца занятий, т.к. занятия могут идти вплотную"""
-    start_time_add_1_minute = start_time + timedelta(minutes=1)
-    end_time_minus_1_minute = end_time - timedelta(minutes=1)
+    start_time_add_1m = start_time + timedelta(minutes=1)
+    end_time_minus_1m = end_time - timedelta(minutes=1)
     time_busy_at_cr = session.query(ClassTime.id, ClassTime.class_room_id, ClassTime.start_time, ClassTime.end_time)\
-        .filter(or_(ClassTime.start_time.between(start_time_add_1_minute, end_time_minus_1_minute),
-                ClassTime.end_time.between(start_time_add_1_minute, end_time_minus_1_minute)),
+        .filter(or_(ClassTime.start_time.between(start_time_add_1m, end_time_minus_1m),
+                ClassTime.end_time.between(start_time_add_1m, end_time_minus_1m)),
                 ClassTime.class_room_id == class_room_id).order_by(ClassTime.start_time).all()
     check_list = []
     teacher_id = int(session.query(Group.teacher_id).filter(Group.id == group_id).scalar())
     time_busy_at_teacher = session.query(
         ClassTime.id, ClassTime.class_room_id, Group.id, ClassTime.start_time, ClassTime.end_time)\
-        .join(Group).filter(or_(ClassTime.start_time.between(start_time_add_1_minute, end_time_minus_1_minute),
-                                ClassTime.end_time.between(start_time_add_1_minute, end_time_minus_1_minute)),
+        .join(Group).filter(or_(ClassTime.start_time.between(start_time_add_1m, end_time_minus_1m),
+                                ClassTime.end_time.between(start_time_add_1m, end_time_minus_1m)),
                             Group.teacher_id == teacher_id).order_by(ClassTime.start_time).all()
     if time_busy_at_cr or time_busy_at_teacher:
         check_list.extend([False, time_busy_at_cr, time_busy_at_teacher])
@@ -225,6 +225,7 @@ def check_class_time_busy(start_time: datetime, end_time: datetime, class_room_i
 
 
 def create_new_class_time(start_time: datetime, end_time: datetime, class_room_id: int, group_id: int) -> str:
+    """Добавляем время занятий в БД"""
     try:
         class_time_add = ClassTime(
             start_time=start_time,
@@ -234,8 +235,8 @@ def create_new_class_time(start_time: datetime, end_time: datetime, class_room_i
         )
         session.add(class_time_add)
         session.commit()
-        return f'Время занятий добавлено'
-    except ValueError as e:
+        return 'Время занятий добавлено'
+    except ValueError:
         return f'{create_new_class_time.__qualname__} ошибка ввода данных'
 
 
@@ -269,6 +270,17 @@ def get_groups_list_for_grade(grade_number:str) -> list:
         ))
     groups_list = session.execute(stmt).scalars().all()
     return groups_list
+
+def get_groups_reservation_text(grade_number: str) -> str:
+    """Получаем список групп в которых ученики учатся в этих классах в школе + номер id"""
+    groups_list = get_groups_list_for_grade(grade_number=grade_number)
+    groups_text = ''
+    for group in groups_list:
+        groups_text += f'{group.id}. {group}\n'
+    return groups_text
+
+
+# print(get_groups_reservation_text(1))
 
 # start_times = datetime(year=2021, month=11, day=1, hour=11, minute=10)
 # end_times = datetime(year=2021, month=11, day=7, hour=12, minute=45)

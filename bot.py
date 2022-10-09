@@ -1,5 +1,8 @@
+"""Бот Языковой студии, возможность добавления ученик, групп, классов, времени занятий"""
+
 from datetime import timedelta
 import logging
+import re
 
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
 from aiogram import Bot, Dispatcher, executor, types
@@ -8,8 +11,8 @@ from aiogram.types import ReplyKeyboardRemove, ReplyKeyboardMarkup, KeyboardButt
 from aiogram.dispatcher import FSMContext
 from business import get_groups_list, get_sql_class_time_list, get_teacher_list, \
     create_new_group, create_new_user, get_class_rooms_list, get_one_group, check_class_time_busy, \
-    add_date, add_time, get_schedule_teacher
-from stategroup import GroupStatesGroup, UserStatesGroup, ClassTimeStatesGroup
+    add_date, add_time, get_schedule_teacher, get_groups_reservation_text
+from stategroup import GradeSearchTimeStatesGroup, GroupStatesGroup, UserStatesGroup, ClassTimeStatesGroup
 
 from config import TELEGRAM_TOKEN
 
@@ -25,7 +28,8 @@ def get_edit_all_data_ikb() -> InlineKeyboardMarkup:
         [InlineKeyboardButton('Добавить группу', callback_data='add_new_groups')],
         [InlineKeyboardButton('Добавить ученика', callback_data='add_new_user')],
         [InlineKeyboardButton('Добавить время занятий', callback_data='add_new_class_time')],
-    ])
+        [InlineKeyboardButton('Расписания учителей', callback_data='teacher_schedule')],
+    ], reply_markup=ReplyKeyboardRemove())
     return ikb
 
 
@@ -91,6 +95,13 @@ async def cb_group_schedule(callback: types.CallbackQuery) -> None:
     await callback.message.answer(get_groups_list(schedule=True))
 
 
+# @dp.callback_query_handler(text='reservation')
+# async def cb_reservation(callback: types.CallbackQuery) -> None:
+#     """Поиск групп по классам"""
+#     await callback.message.delete()
+#     await callback.message.answer(get_groups_list_for_grade(schedule=True))
+
+
 @dp.message_handler(lambda message: message.text.startswith('/classtime'))
 async def get_list_class_time(message: types.Message):
     """Время занятий конкретной группы"""
@@ -99,10 +110,16 @@ async def get_list_class_time(message: types.Message):
     await message.answer(class_time_text)
 
 
-@dp.message_handler(commands=['2'])
-async def process_command_2(message: types.Message):
-    """Временная функция расписание учителя  -- удалить"""
-    await message.reply(get_teacher_list(schedule=1))
+# @dp.message_handler(commands=['2'])
+# async def process_command_2(message: types.Message):
+#     """Временная функция расписание учителя  -- удалить"""
+#     await message.reply(get_teacher_list(schedule=1))
+
+@dp.callback_query_handler(text='teacher_schedule')
+async def cb_teacher_schedule(callback: types.CallbackQuery) -> None:
+    """Расписание для учителя"""
+    await callback.message.delete()
+    await callback.message.answer(get_teacher_list(schedule=1))
 
 
 @dp.message_handler(lambda message: message.text.startswith('/schedule'))
@@ -173,11 +190,11 @@ async def handle_group_grade(message: types.Message, state: FSMContext) -> None:
     try:
         async with state.proxy() as data:
             data['grade'] = [int(i) for i in message.text.split()]  # Разделяем и преобразуем в цифры
+        await message.reply(f'Кто ведет эту группу введите цифру препод.\n{get_teacher_list(schedule=2)}\n Пример: 1')
+        await GroupStatesGroup.next()
     except ValueError:
         await message.reply('Не верно введены данные\n'
         'Какие школ. классы занимаются, цифры через пробел. Пример: 1 2 3')
-    await message.reply(f'Кто ведет эту группу введите цифру препод.\n{get_teacher_list(schedule=2)}\n Пример: 1')
-    await GroupStatesGroup.next()
 
 
 @dp.message_handler(state=GroupStatesGroup.teacher_id)
@@ -191,6 +208,25 @@ async def handle_group_teacher_id(message: types.Message, state: FSMContext) -> 
                      teacher_id=data['teacher_id'])
 
     await message.reply('Спасибо группа создана', reply_markup=get_start_kb())
+    await state.finish()
+
+
+@dp.callback_query_handler(text='reservation')
+async def cb_search_group_by_grade(callback: types.CallbackQuery) -> None:
+    """Поиск групп по классам для записи на тестирование"""
+    await callback.message.delete()
+    await callback.message.answer('Напишите класс в котором учитесь вы или ваш ребенок, 0 - дошкольник, 12 - студент, 13 - взрослый',
+                                  reply_markup=get_cancel_kb())
+    await GradeSearchTimeStatesGroup.grade_name.set()
+
+
+@dp.message_handler(state=GradeSearchTimeStatesGroup.grade_name)
+async def cb_search_group_by_grade_grade_name(message: types.Message, state: FSMContext) -> None:
+    """Поиск групп по классам для записи на тестирование"""
+    async with state.proxy() as data:
+        data['grade_name'] = int(message.text)
+    group_list = get_groups_reservation_text(grade_number=data['grade_name'])
+    await message.reply(f'Напишите номер группы\n{group_list}')
     await state.finish()
 
 
@@ -311,7 +347,7 @@ async def cb_add_new_classtime_start_time(message: types.Message, state: FSMCont
             data['start_time'] = add_time(day=int(times[0]), hour=int(times[1]), minute=int(times[2]))
             duration = get_one_group(group_id=data['group_id'])[1]
             data['end_time'] = data['start_time'] + timedelta(minutes=duration)
-    except ValueError as e:
+    except ValueError:
         await message.reply('Не верно введены данные')
     check_class_time_list = check_class_time_busy(start_time=data['start_time'], end_time=data['end_time'],
                                                   class_room_id=data['class_room_id'], group_id=data['group_id'])

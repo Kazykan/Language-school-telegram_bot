@@ -47,7 +47,17 @@ class Group(Base):
     grades = relationship('Grade', secondary=group_mtm_grade, backref='group')
 
     def __repr__(self) -> str:
-        return f'id:{self.id}, name:{self.name}'
+        return f'{self.name} {self.get_grades_txt()}'
+    
+    def get_grades_list(self) -> list:
+        """Получаем списком классы которые относяться к этой группе"""
+        grades_data = session.query(Group).filter_by(id=self.id).first().grades
+        return grades_data
+    
+    def get_grades_txt(self) -> str:
+        """Получаем текстом классы которые относяться к этой группе"""
+        grade_text = ", ".join(map(str, self.get_grades_list()))
+        return f'({grade_text} классы)'
 
 
 class Grade(Base):
@@ -57,7 +67,7 @@ class Grade(Base):
     name = Column(Integer(), nullable=False)
 
     def __repr__(self) -> str:
-        return f'id:{self.id}, класс:{self.name}'
+        return f'{self.name}'
 
 
 class User(Base):
