@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from datetime import datetime, date, timedelta
+import locale
 from sqlalchemy import create_engine, or_, select, and_
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import Session
@@ -10,6 +11,9 @@ engine = create_engine('sqlite:///sqlite3.db')
 session = Session(bind=engine)
 Base = declarative_base()
 metadata = Base.metadata
+
+
+locale.setlocale(locale.LC_ALL, ('ru_RU', 'UTF-8'))
 
 
 def add_time(hour: int, minute: int, day: int) -> dataclass:
@@ -50,12 +54,13 @@ def get_teacher_list(schedule):
 
 
 def get_schedule_teacher(teacher_id: int):
+    """Получить расписание учителя"""
     try:
         teacher_group_tuple = session.query(
-            ClassTime.class_room_id, Group.name, Teacher.first_name, ClassTime.start_time, ClassTime.end_time
+            ClassTime.class_room_id, Group.id, Teacher.first_name, ClassTime.start_time, ClassTime.end_time
         ).join(ClassTime).join(Teacher).join(ClassRoom).filter(Teacher.id == teacher_id)\
             .group_by(ClassTime.start_time).all()
-    except Exception:
+    except ValueError:
         return 'Ошибка ввода, преподаватель не найден'
     teacher_group_list = []
     index = 0
@@ -73,9 +78,20 @@ def get_classroom_name(id_classroom):
 
 
 def _get_schedule_teacher_text(teacher_group_list: list) -> str:
-    text = f'Расписание {teacher_group_list[0][2]}\n____________\n'
+    text = f'-- Расписание {teacher_group_list[0][2]} --\n'
     for index in teacher_group_list:
-        text = text + f'{index[1]}\n' + _get_time_room_text(start_time=index[3], end_time=index[4], room=index[5])
+        text = text + f'{"-"*22}\n{get_group_name(index[1])}\n' + _get_time_room_text(start_time=index[3], end_time=index[4], room=index[5])
+    return text
+
+
+def get_group_name(group_id) -> str:
+    """Получаем название группы + классы которые там учаться"""
+    group_name = session.query(Group).filter_by(id=group_id).first()
+    return group_name
+
+
+def _get_time_room_text(start_time: datetime, end_time: datetime, room: str) -> str:
+    text = f'{start_time.strftime("%a c %H:%M")} до {end_time.strftime("%H:%M")}\n{room}\n'
     return text
 
 
@@ -99,19 +115,6 @@ def get_group_text(group_list: list, schedule: bool) -> str:
                                       f'_______________\n'
     return group_text
 
-#  ____________________________Поправить___________________________________///////////////////////
-def get_group_grade(grade: int):
-    """Получаем список групп по запросу цифры класса - grade"""
-    grade_str = f'%{str(grade)}%'
-    group_tuple = session.query(
-        Group.id, Group.name, Group.quota, Group.price, Group.duration, Teacher.first_name)\
-        .join(Teacher).filter(Group.grade.ilike(grade_str)).all()
-    if group_tuple:
-        group_list = tuple_to_list_add_user_count(group_tuple=group_tuple)
-        return group_list
-    else:
-        return f'Нет групп для вашего {grade} класса'
-
 
 def tuple_to_list_add_user_count(group_tuple: list) -> list:
     index = 0
@@ -125,10 +128,10 @@ def tuple_to_list_add_user_count(group_tuple: list) -> list:
 
 def get_user_free() -> list:
     """Список всех учеников которые не состоят не в каких группах"""
-    user_list = session.query(
+    users_free = session.query(
         User.id, User.first_name, User.last_name, User.birthday
     ).filter(User.group_id == None).all()
-    return user_list
+    return users_free
 
 
 def get_sql_class_time_list(group_id, edit: bool) -> str:
@@ -150,11 +153,6 @@ def _get_class_time_text(group_and_teacher, class_time_list: list, edit: bool) -
         text = text + _get_time_room_text(start_time=class_time[2], end_time=class_time[3], room=class_time[1])
         if edit:
             text = text + f'удалить - /del_ct_{class_time[0]} \n{"_" * 15}\n'
-    return text
-
-
-def _get_time_room_text(start_time: datetime, end_time: datetime, room: str) -> str:
-    text = f'{start_time.strftime("%A c %H:%M")} до {end_time.strftime("%H:%M")}\n{room}\n'
     return text
 
 
@@ -281,6 +279,11 @@ def get_groups_reservation_text(grade_number: str) -> str:
 
 
 # print(get_groups_reservation_text(1))
+
+print(get_user_free())
+print(get_schedule_teacher(1))
+
+print(session.query(Group).filter_by(id=1).first())
 
 # start_times = datetime(year=2021, month=11, day=1, hour=11, minute=10)
 # end_times = datetime(year=2021, month=11, day=7, hour=12, minute=45)

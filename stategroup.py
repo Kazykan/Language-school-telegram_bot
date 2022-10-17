@@ -31,7 +31,7 @@ class ClassTimeStatesGroup(StatesGroup):
     start_time = State()
 
 
-class GradeSearchTimeStatesGroup(StatesGroup):
+class GradeSearchStatesGroup(StatesGroup):
     """Машина состояний для работы опросника по поиску группы по классу ученика и запись на тестирование"""
     grade_name = State()
     group_id = State()
