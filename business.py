@@ -97,33 +97,32 @@ def _get_time_room_text(start_time: datetime, end_time: datetime, room: str) -> 
 
 def get_groups_list(schedule: bool) -> str:
     """Получаем список групп, распаковываем кортеж + добавляем в конец кол-во учеников в группе"""
-    group_tuple = session.query(Group.id, Group.name, Group.quota, Teacher.first_name).join(Teacher).all()
-    group_list = tuple_to_list_add_user_count(group_tuple=group_tuple)
-    group_text = get_group_text(group_list, schedule)
-    return group_text
-
-
-def get_group_text(group_list: list, schedule: bool) -> str:
+    groups = session.query(Group).join(Teacher).all()
     group_text = 'Список групп:\n'
-    for lists in group_list:
+    for group in groups:
         if not schedule:
-            group_text = group_text + f'{lists[0]}. '
-        group_text = group_text + f'{lists[1]} - 🇺🇸 {lists[3]}\n'
+            group_text += f'{group.id}. '
+        group_text += f'{group} - 🇺🇸 {group.teacher.first_name}\n'
         if schedule:
-            group_text = group_text + f'Кол-во мест в группе: {lists[2]} - свободно мест {lists[2] - lists[4]}\n'\
-                                      f'📅 Время занятий /classtime{lists[0]}\n'\
-                                      f'_______________\n'
+            group_text += f'{is_place_group(group_id=group.id, quota=group.quota)}\n'\
+                          f'📅 Время занятий /classtime{group.id}\n{"-"*15}\n'
     return group_text
 
 
-def tuple_to_list_add_user_count(group_tuple: list) -> list:
-    index = 0
-    group_list = []
-    for group_id in group_tuple:
-        group_list.append([*group_id])
-        group_list[index].append(session.query(User.id).filter(User.group_id == group_id[0]).count())
-        index += 1
-    return group_list
+def is_place_group(group_id: int, quota: int) -> str:
+    """Есть место в группе текстом"""
+    count_user = get_count_user_in_group(group_id=group_id)
+    if count_user <= quota:
+        text_place = '✅ есть свободные места'
+    else:
+        text_place = '❌ нет мест'
+    return text_place
+
+
+def get_count_user_in_group(group_id: int) -> int:
+    """Получаем кол-во учеников в группе"""
+    count_user = session.query(User.id).filter(User.group_id == group_id).count()
+    return count_user
 
 
 def get_user_free() -> list:
@@ -280,10 +279,14 @@ def get_groups_reservation_text(grade_number: str) -> str:
 
 # print(get_groups_reservation_text(1))
 
-print(get_user_free())
-print(get_schedule_teacher(1))
+# print(get_user_free())
+# print(get_schedule_teacher(1))
 
-print(session.query(Group).filter_by(id=1).first())
+# print(session.query(Group).filter_by(id=1).first())
+
+
+
+# print(get_group_list(schedule=True))
 
 # start_times = datetime(year=2021, month=11, day=1, hour=11, minute=10)
 # end_times = datetime(year=2021, month=11, day=7, hour=12, minute=45)
