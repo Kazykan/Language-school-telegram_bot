@@ -1,6 +1,7 @@
 """Бот Языковой студии, возможность добавления ученик, групп, классов, времени занятий"""
 
 from datetime import timedelta
+from email import message
 import logging
 import re
 
@@ -9,19 +10,33 @@ from aiogram import Bot, Dispatcher, executor, types
 from aiogram.types import ReplyKeyboardRemove, ReplyKeyboardMarkup, KeyboardButton,\
     InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.dispatcher import FSMContext
-from business import get_groups_list, get_sql_class_time_list, get_teacher_list, \
+from business import get_groups_list, get_class_time, get_teacher_list, \
     create_new_group, create_new_user, get_class_rooms_list, get_one_group, check_class_time_busy, \
     add_date, add_time, get_schedule_teacher, get_groups_reservation_text
 from stategroup import GradeSearchStatesGroup, GroupStatesGroup, UserStatesGroup, \
     ClassTimeStatesGroup
 
-from config import TELEGRAM_TOKEN
+from config import TELEGRAM_TOKEN, ADMIN_ID, CHANNEL_ID
+
 
 bot = Bot(token=TELEGRAM_TOKEN)  # Объект бота
 dp = Dispatcher(bot,
                 storage=MemoryStorage())  # Диспетчер для бота
 logging.basicConfig(level=logging.INFO)  # Вкл логирование, чтобы не пропустить важные сообщения
 
+
+acl = (172457394,)
+# def admin_only_f(message):
+#     if message.from_user.id not in acl:
+#         return True
+#     else:
+#         print(message.from_user.id)
+admin_only = lambda message: message.from_user.id in ADMIN_ID
+
+
+async def send_message_chanel(text: str):
+    """Отправка сообщения в канал"""
+    await bot.send_message(CHANNEL_ID, text)
 
 
 @dp.message_handler(commands=['start'])
@@ -58,7 +73,7 @@ def get_cancel_kb() -> ReplyKeyboardMarkup:
     return kb
 
 
-@dp.callback_query_handler(text='edit')
+@dp.callback_query_handler(admin_only, text='edit')
 async def cb_teacher_keyboard(callback: types.CallbackQuery) -> None:
     """Отработка кнопки учителю"""
     await callback.message.delete()
@@ -70,15 +85,15 @@ async def cb_teacher_keyboard(callback: types.CallbackQuery) -> None:
 def get_edit_all_data_ikb() -> InlineKeyboardMarkup:
     """Кнопки редактирования данных, добавить еще кнопки ++++"""
     ikb = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton('Добавить|удалить|поправить группу', callback_data='tasks_group')],
-        [InlineKeyboardButton('Добавить|удалить|поправить ученика', callback_data='tasks_user')],
-        [InlineKeyboardButton('Добавить|удалить время занятий', callback_data='tasks_class_time')],
+        [InlineKeyboardButton('Доб.|удалить|поправить группу', callback_data='tasks_group')],
+        [InlineKeyboardButton('Доб.|удалить|поправить ученика', callback_data='tasks_user')],
+        [InlineKeyboardButton('Доб.|удалить время занятий', callback_data='tasks_class_time')],
         [InlineKeyboardButton('Расписания учителей', callback_data='teacher_schedule')],
     ], reply_markup=ReplyKeyboardRemove())
     return ikb
 
 
-@dp.callback_query_handler(text='tasks_group')
+@dp.callback_query_handler(admin_only, text='tasks_group')
 async def cb_tasks_group(callback: types.CallbackQuery) -> None:
     """Отработка кнопки Добавить|удалить|поправить группу"""
     await callback.message.delete()
@@ -98,7 +113,7 @@ def get_tasks_group_ikb() -> InlineKeyboardMarkup:
     return ikb
 
 
-@dp.callback_query_handler(text='tasks_user')
+@dp.callback_query_handler(admin_only, text='tasks_user')
 async def cb_tasks_groups(callback: types.CallbackQuery) -> None:
     """Отработка кнопки Добавить|удалить|поправить ученика"""
     await callback.message.delete()
@@ -118,7 +133,7 @@ def get_tasks_user_ikb() -> InlineKeyboardMarkup:
     return ikb
 
 
-@dp.callback_query_handler(text='tasks_class_time')
+@dp.callback_query_handler(admin_only, text='tasks_class_time')
 async def cb_tasks_class_time(callback: types.CallbackQuery) -> None:
     """Отработка кнопки Добавить|удалить время занятий"""
     await callback.message.delete()
@@ -156,7 +171,7 @@ async def cb_group_schedule(callback: types.CallbackQuery) -> None:
 async def get_list_class_time(message: types.Message):
     """Время занятий конкретной группы"""
     group_id = int(message.text[10:])
-    class_time_text = get_sql_class_time_list(group_id, edit=False)
+    class_time_text = get_class_time(group_id, is_edit=False)
     await message.answer(class_time_text)
 
 
@@ -271,7 +286,29 @@ async def cb_search_group_by_grade_grade_name(message: types.Message, state: FSM
     async with state.proxy() as data:
         data['grade_name'] = int(message.text)
     group_list = get_groups_reservation_text(grade_number=data['grade_name'])
-    await message.reply(f'Напишите номер группы\n{group_list}')
+    await message.reply(f'Напишите номер группы который вам подходит по рассписанию: \n{group_list}')
+    await GradeSearchStatesGroup.group_id.set()
+
+
+
+@dp.message_handler(state=GradeSearchStatesGroup.group_id)
+async def cb_search_group_by_grade_group_id(message: types.Message, state: FSMContext) -> None:
+    """Поиск групп по классам для записи на тестирование"""
+    async with state.proxy() as data:
+        data['group_id'] = (message.text)
+    await message.reply('Напишите номер телефона для связи и ваше имя:\n')
+    await GradeSearchStatesGroup.contact_info.set()
+
+
+@dp.message_handler(state=GradeSearchStatesGroup.contact_info)
+async def cb_search_group_by_grade_contact_info(message: types.Message, state: FSMContext) -> None:
+    """Поиск групп по классам для записи на тестирование"""
+    async with state.proxy() as data:
+        data['contact_info'] = (message.text)
+    await message.reply('Большое спасибо, мы обязятельно с вами свяжемся')
+    text_reservation = get_groups_reservation_text(grade_number=data['grade_name'])
+    text_reservation += f"\n\ncontact - {data['contact_info']}\n group: {data['group_id']}. grade - {data['grade_name']}"
+    await send_message_chanel(text_reservation)
     await state.finish()
 
 
@@ -367,7 +404,7 @@ async def cb_add_classtime_group_id(message: types.Message, state: FSMContext) -
     async with state.proxy() as data:
         data['group_id'] = int(message.text)
 
-    await message.reply(f'{get_sql_class_time_list(data["group_id"], edit=True)} Введите номер кабинета. Пример 1\n'
+    await message.reply(f'{get_class_time(data["group_id"], is_edit=True)} Введите номер кабинета. Пример 1\n'
                         f'{get_class_rooms_list()}')
     await ClassTimeStatesGroup.next()
 

@@ -35,3 +35,4 @@ class GradeSearchStatesGroup(StatesGroup):
     """Машина состояний для работы опросника по поиску группы по классу ученика и запись на тестирование"""
     grade_name = State()
     group_id = State()
+    contact_info = State()

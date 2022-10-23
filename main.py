@@ -31,6 +31,9 @@ class Teacher(Base):
     created_on = Column(DateTime(), default=datetime.now)
     updated_on = Column(DateTime(), default=datetime.now, onupdate=datetime.now)
 
+    def __repr__(self) -> str:
+        return f'{self.last_name} {self.first_name}'
+
 
 class Group(Base):
     """Группы с максимальным кол-вом учеников, ценой и длительностью занятия"""

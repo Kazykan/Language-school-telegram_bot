@@ -96,7 +96,7 @@ def _get_time_room_text(start_time: datetime, end_time: datetime, room: str) -> 
 
 
 def get_groups_list(schedule: bool) -> str:
-    """Получаем список групп, распаковываем кортеж + добавляем в конец кол-во учеников в группе"""
+    """Получаем список групп, добавляем в конец кол-во учеников в группе"""
     groups = session.query(Group).join(Teacher).all()
     group_text = 'Список групп:\n'
     for group in groups:
@@ -104,14 +104,15 @@ def get_groups_list(schedule: bool) -> str:
             group_text += f'{group.id}. '
         group_text += f'{group} - 🇺🇸 {group.teacher.first_name}\n'
         if schedule:
-            group_text += f'{is_place_group(group_id=group.id, quota=group.quota)}\n'\
+            group_text += f'{is_place_group(group_id=group.id)}\n'\
                           f'📅 Время занятий /classtime{group.id}\n{"-"*15}\n'
     return group_text
 
 
-def is_place_group(group_id: int, quota: int) -> str:
+def is_place_group(group_id: int) -> str:
     """Есть место в группе текстом"""
     count_user = get_count_user_in_group(group_id=group_id)
+    quota = session.query(Group.quota).filter(Group.id == group_id).scalar()
     if count_user <= quota:
         text_place = '✅ есть свободные места'
     else:
@@ -133,26 +134,43 @@ def get_user_free() -> list:
     return users_free
 
 
-def get_sql_class_time_list(group_id, edit: bool) -> str:
+# def get_class_time(group_id, is_edit: bool) -> str:
+#     """Получаем время занятий для группы"""
+#     class_time_list = session.query(ClassTime.id, ClassRoom.name, ClassTime.start_time, ClassTime.end_time)\
+#         .join(ClassRoom).filter(ClassTime.group_id == group_id).group_by(ClassTime.start_time).all()
+#     if class_time_list:
+#         group_and_teacher = session.query(Group.name, Teacher.first_name).join(Group).filter(Group.id == group_id).all()[0]
+#         text = _get_class_time_text([*group_and_teacher], class_time_list, edit)
+#         return text
+#     else:
+#         return 'Нет расписания'
+
+
+def get_class_time(group_id, is_edit: bool) -> str:
     """Получаем время занятий для группы"""
-    class_time_list = session.query(ClassTime.id, ClassRoom.name, ClassTime.start_time, ClassTime.end_time)\
-        .join(ClassRoom).filter(ClassTime.group_id == group_id).group_by(ClassTime.start_time).all()
-    if class_time_list:
-        group_and_teacher = session.query(Group.name, Teacher.first_name).join(Group).filter(Group.id == group_id).all()[0]
-        text = _get_class_time_text([*group_and_teacher], class_time_list, edit)
+    class_times = session.query(ClassTime).filter(ClassTime.group_id == group_id).\
+        join(Group, Group.id==ClassTime.group_id).\
+        join(ClassRoom, ClassRoom.id==ClassTime.class_room_id).all()
+    if class_times:
+        teacher_full_name = get_teacher_full_name(teacher_id=class_times[0].group.teacher_id)
+        text = f'{class_times[0].group}\n🧑‍🏫 {teacher_full_name}\n-----время_занятий------\n\n'
+        for one in class_times:
+            text += _get_time_room_text(start_time=one.start_time,
+                                        end_time=one.end_time,
+                                        room=one.class_room.name)
+            if is_edit:
+                text += f'🇽 удалить - /del_ct_{one.id}\n'
+            text += f' {"- " * 20}\n'
         return text
     else:
-        return 'Нет расписания'
+        return '❌ Нет расписания'
 
 
-def _get_class_time_text(group_and_teacher, class_time_list: list, edit: bool) -> str:
-    text = f'{group_and_teacher[0]} - 🇺🇸 {group_and_teacher[1]}\n______время_занятий________\n'
-    for class_time_tuple in class_time_list:
-        class_time = [*class_time_tuple]
-        text = text + _get_time_room_text(start_time=class_time[2], end_time=class_time[3], room=class_time[1])
-        if edit:
-            text = text + f'удалить - /del_ct_{class_time[0]} \n{"_" * 15}\n'
-    return text
+def get_teacher_full_name(teacher_id: int) -> str:
+    """Получаем фамилие и имя преподователя"""
+    full_name = session.query(Teacher).filter(Teacher.id == teacher_id).first()
+    full_name_text = f'{full_name}'
+    return full_name_text
 
 
 def create_new_group(name: str, quota: int, price: int, duration: int, description: str, grades: list, teacher_id: int):
@@ -273,7 +291,9 @@ def get_groups_reservation_text(grade_number: str) -> str:
     groups_list = get_groups_list_for_grade(grade_number=grade_number)
     groups_text = ''
     for group in groups_list:
-        groups_text += f'{group.id}. {group}\n'
+        groups_text += f'{"- "*20}\n{is_place_group(group_id=group.id)}\n'
+        groups_text += f'{group.id}. '
+        groups_text += f'{get_class_time(group_id=group.id, is_edit=False)}'
     return groups_text
 
 
