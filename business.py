@@ -153,7 +153,7 @@ def get_class_time(group_id, is_edit: bool) -> str:
         join(ClassRoom, ClassRoom.id==ClassTime.class_room_id).all()
     if class_times:
         teacher_full_name = get_teacher_full_name(teacher_id=class_times[0].group.teacher_id)
-        text = f'{class_times[0].group}\n🧑‍🏫 {teacher_full_name}\n-----время_занятий------\n\n'
+        text = f'{class_times[0].group}\n🧑‍🏫 {teacher_full_name}\n----- время занятий ------\n\n'
         for one in class_times:
             text += _get_time_room_text(start_time=one.start_time,
                                         end_time=one.end_time,

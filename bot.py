@@ -59,9 +59,7 @@ def get_start_ikb() -> InlineKeyboardMarkup:
 
 def get_start_kb() -> ReplyKeyboardMarkup:
     kb = ReplyKeyboardMarkup(keyboard=[
-        [KeyboardButton('/edit')],
         [KeyboardButton('/start')],
-        [KeyboardButton('/back')],
     ], resize_keyboard=True)
     return kb
 
@@ -267,7 +265,7 @@ async def handle_group_teacher_id(message: types.Message, state: FSMContext) -> 
                      description=data['description'], grades=data['grade'],
                      teacher_id=data['teacher_id'])
 
-    await message.reply('Спасибо группа создана', reply_markup=get_start_kb())
+    await message.reply('Спасибо группа создана', reply_markup=get_start_ikb())
     await state.finish()
 
 
